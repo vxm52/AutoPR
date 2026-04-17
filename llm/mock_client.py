@@ -46,10 +46,10 @@ class MockLLMClient:
         """
         system_lower = system.lower()
 
-        if "classify" in system_lower or "task type" in system_lower:
+        if "classify" in system_lower or "bug_fix" in system_lower or "feature" in system_lower or "refactor" in system_lower:
             return "bug_fix"
 
-        if "plan" in system_lower or "json" in system_lower:
+        if ("plan" in system_lower and "json" in system_lower) or "schema" in system_lower:
             return MOCK_PLAN_JSON
 
         if "editing a single source file" in system_lower:

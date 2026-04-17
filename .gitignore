@@ -20,3 +20,6 @@ venv/
 
 # Test artifacts
 .pytest_cache/
+
+# Development
+CLAUDE.md

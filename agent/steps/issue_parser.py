@@ -4,8 +4,17 @@ Input: ctx.issue (title + body populated)
 Output: sets ctx.issue.task_type to one of "bug_fix", "feature", "refactor"
 """
 
-from agent.context import RunContext
+from agent.context import RunContext, StepError
 from llm.client import get_client
+
+VALID_TASK_TYPES = {"bug_fix", "feature", "refactor"}
+
+SYSTEM_PROMPT = (
+    "You are a classifier for GitHub issues. "
+    "Given an issue title and body, respond with exactly one word: "
+    "bug_fix, feature, or refactor. "
+    "No punctuation, no explanation."
+)
 
 
 def run(ctx: RunContext) -> None:
@@ -23,4 +32,14 @@ def run(ctx: RunContext) -> None:
     Raises:
         StepError: If classification fails.
     """
-    raise NotImplementedError("issue_parser.run not yet implemented")
+    user_msg = f"Title: {ctx.issue.title}\n\nBody: {ctx.issue.body}"
+    raw = get_client().complete(system=SYSTEM_PROMPT, user=user_msg, max_tokens=10)
+    task_type = raw.strip().lower()
+
+    if task_type not in VALID_TASK_TYPES:
+        raise StepError(
+            f"issue_parser: LLM returned unexpected classification {raw!r}. "
+            f"Expected one of {VALID_TASK_TYPES}."
+        )
+
+    ctx.issue.task_type = task_type
