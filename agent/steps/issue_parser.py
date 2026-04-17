@@ -5,6 +5,7 @@ Output: sets ctx.issue.task_type to one of "bug_fix", "feature", "refactor"
 """
 
 from agent.context import RunContext
+from llm.client import get_client
 
 
 def run(ctx: RunContext) -> None:

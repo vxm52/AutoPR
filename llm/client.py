@@ -71,3 +71,16 @@ class LLMClient:
             return data["choices"][0]["message"]["content"]
         except (KeyError, IndexError) as e:
             raise LLMError(f"Unexpected LLM response format: {data}") from e
+
+
+def get_client():
+    """Return the appropriate LLM client based on environment configuration.
+
+    Returns MockLLMClient when USE_MOCK_LLM=true, otherwise LLMClient.
+    All pipeline steps should call this instead of instantiating LLMClient directly.
+    """
+    from llm.mock_client import MockLLMClient
+
+    if os.environ.get("USE_MOCK_LLM", "").lower() == "true":
+        return MockLLMClient()
+    return LLMClient()

@@ -8,6 +8,7 @@ The LLM outputs JSON only, matching the Plan dataclass schema.
 """
 
 from agent.context import RunContext
+from llm.client import get_client
 
 
 PLANNER_SYSTEM_PROMPT = """You are a senior engineer reviewing a GitHub issue.

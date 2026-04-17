@@ -13,6 +13,7 @@ IMPORTANT: Process files one at a time. Do not batch multiple files in one LLM c
 """
 
 from agent.context import RunContext
+from llm.client import get_client
 
 
 CODE_GENERATOR_SYSTEM_PROMPT = """You are editing a single source file based on a specific instruction.
