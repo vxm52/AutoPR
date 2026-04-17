@@ -12,7 +12,9 @@ For each file in plan.files_to_modify:
 IMPORTANT: Process files one at a time. Do not batch multiple files in one LLM call.
 """
 
-from agent.context import RunContext
+from pathlib import Path
+
+from agent.context import RunContext, FilePatch, StepError
 from llm.client import get_client
 
 
@@ -39,4 +41,25 @@ def run(ctx: RunContext) -> None:
     Raises:
         StepError: If code generation fails for any file.
     """
-    raise NotImplementedError("code_generator.run not yet implemented")
+    if not ctx.plan:
+        raise StepError("code_generator: ctx.plan is not set — run planner first")
+
+    repo_path = Path(ctx.repo_path).resolve()
+    client = get_client()
+
+    for file_plan in ctx.plan.files_to_modify:
+        file_path = repo_path / file_plan.path
+        if not file_path.exists():
+            raise StepError(
+                f"code_generator: file does not exist: {file_plan.path}"
+            )
+
+        original = file_path.read_text(encoding="utf-8")
+        user_msg = f"File: {file_plan.path}\n\nInstruction: {file_plan.change_summary}\n\n{original}"
+        modified = client.complete(system=CODE_GENERATOR_SYSTEM_PROMPT, user=user_msg)
+
+        ctx.patches.append(FilePatch(
+            path=file_plan.path,
+            original_content=original,
+            modified_content=modified,
+        ))
