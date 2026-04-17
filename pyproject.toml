@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "autopr"
+version = "0.1.0"
+description = "Autonomous developer agent that creates PRs from GitHub issues"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.100.0",
+    "uvicorn>=0.23.0",
+    "pygithub>=2.1.0",
+    "gitpython>=3.1.0",
+    "faiss-cpu>=1.7.0",
+    "sentence-transformers>=2.2.0",
+    "tree-sitter>=0.20.0",
+    "httpx>=0.24.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+]
+
+[project.scripts]
+autopr = "autopr.run:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["agent*", "api*", "llm*", "github*", "autopr*"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true

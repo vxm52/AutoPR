@@ -1,0 +1,22 @@
+# Environment variables
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# FAISS indexes
+**/.autopr_index/
+
+# Editor
+.DS_Store
+.idea/
+.vscode/
+
+# Test artifacts
+.pytest_cache/
