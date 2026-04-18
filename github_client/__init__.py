@@ -1,5 +1,5 @@
 """GitHub client module."""
 
-from github.client import GitHubClient, GitHubError
+from github_client.client import GitHubClient, GitHubError
 
 __all__ = ["GitHubClient", "GitHubError"]

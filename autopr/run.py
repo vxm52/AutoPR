@@ -9,7 +9,7 @@ import sys
 
 from agent.controller import AgentController
 from agent.context import RunContext, Issue
-from github.client import GitHubClient
+from github_client.client import GitHubClient
 
 
 def parse_args() -> argparse.Namespace:

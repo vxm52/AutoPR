@@ -1,42 +1,94 @@
-"""PR creator step — creates branch, commits changes, opens pull request.
+import os
+import git
+from github import Github  # PyGitHub package
+from agent.context import RunContext, StepError
 
-Input: ctx.patches, ctx.diffs, ctx.plan, ctx.issue
-Output: sets ctx.pr_url
 
-Steps:
-1. Create branch (format: autopr/issue-{issue.number})
-2. Apply patches to files
-3. Commit changes
-4. Push to remote
-5. Open PR via GitHub API
+def _pick_branch_name(repo: git.Repo, base: str) -> str:
+    existing = {h.name for h in repo.heads}
+    if base not in existing:
+        return base
+    n = 1
+    while f"{base}-retry-{n}" in existing:
+        n += 1
+    return f"{base}-retry-{n}"
 
-Branch naming:
-- Format: autopr/issue-{number}
-- If branch exists, append -retry-{n}
 
-PR format:
-- Title: [AutoPR] {issue.title}
-- Body: reasoning + summary of files changed + link to original issue
-
-Uses GitPython for local git operations; PyGitHub for PR creation.
-"""
-
-from agent.context import RunContext
+def _build_pr_body(ctx: RunContext) -> str:
+    files_changed = "\n".join(f"- `{p.path}`" for p in ctx.patches)
+    issue_url = (
+        f"https://github.com/{ctx.issue.repo_owner}/"
+        f"{ctx.issue.repo_name}/issues/{ctx.issue.number}"
+    )
+    return (
+        f"## Reasoning\n\n{ctx.plan.reasoning}\n\n"
+        f"## Files changed\n\n{files_changed}\n\n"
+        f"## Related issue\n\nCloses {issue_url}"
+    )
 
 
 def run(ctx: RunContext) -> None:
-    """Create a pull request with the generated changes.
+    repo = git.Repo(ctx.repo_path)
 
-    Creates a new branch, applies patches, commits, pushes,
-    and opens a PR via the GitHub API.
+    default_branch = repo.active_branch.name
+    if default_branch in ("main", "master"):
+        pass  # we're on the base; that's fine — we'll branch off it
 
-    Args:
-        ctx: RunContext with ctx.patches, ctx.diffs, ctx.plan, and ctx.issue set.
+    base_branch_name = f"autopr/issue-{ctx.issue.number}"
+    branch_name = _pick_branch_name(repo, base_branch_name)
 
-    Mutates:
-        ctx.pr_url: Set to the URL of the created pull request.
+    try:
+        new_branch = repo.create_head(branch_name)
+        new_branch.checkout()
+    except Exception as e:
+        raise StepError(f"pr_creator: branch creation failed — {e}") from e
 
-    Raises:
-        StepError: If branch creation fails or PR cannot be opened.
-    """
-    raise NotImplementedError("pr_creator.run not yet implemented")
+    if repo.active_branch.name in ("main", "master"):
+        raise StepError(
+            f"pr_creator: refusing to commit to {repo.active_branch.name}"
+        )
+
+    for patch in ctx.patches:
+        full_path = os.path.join(ctx.repo_path, patch.path)
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        with open(full_path, "w") as f:
+            f.write(patch.modified_content)
+        repo.index.add([patch.path])
+
+    if not repo.index.diff("HEAD"):
+        ctx.step_log.append("WARN pr_creator: nothing to commit, skipping PR")
+        return
+
+    repo.index.commit(
+        f"[AutoPR] {ctx.issue.title}\n\nCloses #{ctx.issue.number}"
+    )
+
+    token = os.environ.get("GITHUB_TOKEN")
+    if not token:
+        raise StepError("pr_creator: GITHUB_TOKEN not set")
+
+    origin = repo.remote("origin")
+    original_url = origin.url
+    auth_url = f"https://{token}@github.com/{ctx.issue.repo_owner}/{ctx.issue.repo_name}.git"
+    try:
+        origin.set_url(auth_url)
+        origin.push(refspec=f"{branch_name}:{branch_name}")
+    except Exception as e:
+        raise StepError(f"pr_creator: push failed — {e}") from e
+    finally:
+        origin.set_url(original_url)
+
+    gh = Github(token)
+    gh_repo = gh.get_repo(f"{ctx.issue.repo_owner}/{ctx.issue.repo_name}")
+
+    try:
+        pr = gh_repo.create_pull(
+            title=f"[AutoPR] {ctx.issue.title}",
+            body=_build_pr_body(ctx),
+            head=branch_name,
+            base=default_branch,
+        )
+        ctx.pr_url = pr.html_url
+        ctx.step_log.append(f"OK   pr_creator: {ctx.pr_url}")
+    except Exception as e:
+        raise StepError(f"pr_creator: PR creation failed — {e}") from e
