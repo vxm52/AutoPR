@@ -1,26 +1,11 @@
-"""Diff generator step — creates unified diffs from patches.
-
-Input: ctx.patches
-Output: populates ctx.diffs
-
-Uses difflib.unified_diff — do NOT ask the LLM to generate diffs.
-Validates each diff applies cleanly with patch --dry-run before appending.
-If a diff fails dry-run, log a warning and skip that file (do not raise).
-"""
-
 import difflib
+import subprocess
+import tempfile
+import os
 from agent.context import RunContext, FilePatch
 
 
 def make_diff(patch: FilePatch) -> str:
-    """Generate a unified diff from a FilePatch.
-
-    Args:
-        patch: FilePatch containing original and modified content.
-
-    Returns:
-        Unified diff string.
-    """
     return "".join(
         difflib.unified_diff(
             patch.original_content.splitlines(keepends=True),
@@ -31,20 +16,31 @@ def make_diff(patch: FilePatch) -> str:
     )
 
 
+def _dry_run_passes(diff: str, patch: FilePatch, repo_path: str) -> bool:
+    if not diff:
+        return True
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".patch", delete=False) as f:
+        f.write(diff)
+        patch_file = f.name
+    try:
+        target = os.path.join(repo_path, patch.path)
+        result = subprocess.run(
+            ["patch", "--dry-run", "-p1", target, patch_file],
+            capture_output=True,
+        )
+        return result.returncode == 0
+    finally:
+        os.unlink(patch_file)
+
+
 def run(ctx: RunContext) -> None:
-    """Generate unified diffs for all patches.
-
-    Creates diffs using difflib (not LLM) and validates each
-    can be applied cleanly.
-
-    Args:
-        ctx: RunContext with ctx.patches populated.
-
-    Mutates:
-        ctx.diffs: Populated with unified diff strings.
-
-    Note:
-        Does not raise on validation failure — skips invalid diffs
-        with a warning logged to ctx.step_log.
-    """
-    raise NotImplementedError("diff_generator.run not yet implemented")
+    for patch in ctx.patches:
+        diff = make_diff(patch)
+        if not diff:
+            ctx.step_log.append(f"SKIP diff_generator: {patch.path} — no changes")
+            continue
+        if _dry_run_passes(diff, patch, ctx.repo_path):
+            ctx.diffs.append(diff)
+            ctx.step_log.append(f"OK   diff_generator: {patch.path}")
+        else:
+            ctx.step_log.append(f"WARN diff_generator: {patch.path} — dry-run failed, skipping")

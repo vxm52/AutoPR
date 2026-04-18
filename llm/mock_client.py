@@ -53,6 +53,9 @@ class MockLLMClient:
             return MOCK_PLAN_JSON
 
         if "editing a single source file" in system_lower:
-            return user
+            # The user message is "File: ...\n\nInstruction: ...\n\n{file_content}".
+            # Return only the file content, mirroring what the real LLM returns.
+            parts = user.split("\n\n", 2)
+            return parts[2] if len(parts) >= 3 else user
 
         return "Mock response"
