@@ -57,6 +57,9 @@ class LLMClient:
             ],
             "max_tokens": max_tokens,
         }
+        model = os.environ.get("LLM_MODEL")
+        if model:
+            payload["model"] = model
 
         try:
             response = httpx.post(url, headers=headers, json=payload, timeout=60.0)
