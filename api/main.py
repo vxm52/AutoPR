@@ -36,21 +36,28 @@ class RunRequest(BaseModel):
 def _clone_or_pull(owner: str, name: str, token: str) -> str:
     clone_base = os.environ.get("REPO_CLONE_PATH", "/tmp/autopr_repos")
     repo_path = os.path.join(clone_base, f"{owner}_{name}")
+    plain_url = f"https://github.com/{owner}/{name}.git"
     auth_url = f"https://{token}@github.com/{owner}/{name}.git"
 
     if os.path.exists(repo_path):
         g = git.Repo(repo_path)
         origin = g.remote("origin")
-        old_url = origin.url
+        original_url = origin.url
         try:
             origin.set_url(auth_url)
+            # Fetch then reset so we land on the default branch cleanly,
+            # even if pr_creator left the repo on an autopr/* branch.
+            default = g.git.symbolic_ref("refs/remotes/origin/HEAD").split("/")[-1]
+            g.git.checkout(default)
             origin.pull()
+        except Exception as e:
+            raise RuntimeError(f"git pull failed for {owner}/{name}: {e}") from e
         finally:
-            origin.set_url(old_url)
+            origin.set_url(original_url)
     else:
         os.makedirs(clone_base, exist_ok=True)
         g = git.Repo.clone_from(auth_url, repo_path)
-        g.remote("origin").set_url(f"https://github.com/{owner}/{name}.git")
+        g.remote("origin").set_url(plain_url)
 
     return repo_path
 

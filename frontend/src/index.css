@@ -1,0 +1,42 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg:         #09090b;
+  --bg-card:    #111113;
+  --bg-input:   #18181b;
+  --border:     #27272a;
+  --border-hi:  #3f3f46;
+  --text:       #fafafa;
+  --text-muted: #71717a;
+  --text-dim:   #3f3f46;
+  --green:      #4ade80;
+  --amber:      #fbbf24;
+  --red:        #f87171;
+  --blue:       #60a5fa;
+  --mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; cursor: pointer; border: none; }
+input  { font-family: inherit; }

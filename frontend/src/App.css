@@ -1,0 +1,370 @@
+/* ── Layout ─────────────────────────────────────────────── */
+.page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+}
+
+/* ── Navbar ─────────────────────────────────────────────── */
+.navbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 24px;
+  height: 52px;
+  border-bottom: 1px solid var(--border);
+}
+
+.navbar-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.navbar-logo svg {
+  color: var(--text-muted);
+}
+
+/* ── Home page ──────────────────────────────────────────── */
+.home-card {
+  width: 100%;
+  max-width: 440px;
+}
+
+.home-header {
+  margin-bottom: 32px;
+  text-align: center;
+}
+
+.home-header h1 {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.home-header p {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.field input {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+}
+
+.field input::placeholder {
+  color: var(--text-dim);
+}
+
+.field input:focus {
+  border-color: var(--border-hi);
+}
+
+.field input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  margin-top: 6px;
+  padding: 11px 20px;
+  background: var(--text);
+  color: var(--bg);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  width: 100%;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.btn-primary:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.form-error {
+  font-size: 13px;
+  color: var(--red);
+  margin-top: 4px;
+}
+
+/* ── Status page ────────────────────────────────────────── */
+.status-card {
+  width: 100%;
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.status-header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.status-header h2 {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+
+.status-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--mono);
+}
+
+/* ── Status badge ───────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 20px;
+  width: fit-content;
+}
+
+.badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.badge-pending {
+  background: rgba(113,113,122,0.12);
+  color: var(--text-muted);
+}
+.badge-pending .badge-dot {
+  background: var(--text-muted);
+}
+
+.badge-running {
+  background: rgba(96,165,250,0.1);
+  color: var(--blue);
+}
+.badge-running .badge-dot {
+  background: var(--blue);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.badge-done {
+  background: rgba(74,222,128,0.1);
+  color: var(--green);
+}
+.badge-done .badge-dot {
+  background: var(--green);
+}
+
+.badge-failed {
+  background: rgba(248,113,113,0.1);
+  color: var(--red);
+}
+.badge-failed .badge-dot {
+  background: var(--red);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.75); }
+}
+
+/* ── Step log terminal ──────────────────────────────────── */
+.log-block {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.log-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.log-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--border-hi);
+}
+
+.log-title {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--mono);
+  margin-left: 4px;
+}
+
+.log-body {
+  padding: 16px;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.log-empty {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text-dim);
+  padding: 4px 0;
+}
+
+.log-line {
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.5;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  animation: slide-in 0.2s ease-out forwards;
+  opacity: 0;
+}
+
+@keyframes slide-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.log-prefix {
+  font-weight: 600;
+  min-width: 36px;
+  flex-shrink: 0;
+}
+
+.log-ok   { color: var(--green); }
+.log-warn { color: var(--amber); }
+.log-err  { color: var(--red); }
+.log-info { color: var(--text-muted); }
+
+.log-msg {
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+/* ── Errors panel ───────────────────────────────────────── */
+.errors-block {
+  background: rgba(248,113,113,0.05);
+  border: 1px solid rgba(248,113,113,0.2);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.errors-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--red);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.errors-msg {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: #fca5a5;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+/* ── PR button ──────────────────────────────────────────── */
+.pr-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: var(--green);
+  color: #052e16;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: opacity 0.15s, transform 0.1s;
+  animation: pop-in 0.3s cubic-bezier(0.34,1.56,0.64,1) forwards;
+}
+
+.pr-cta:hover {
+  opacity: 0.88;
+}
+
+.pr-cta:active {
+  transform: scale(0.97);
+}
+
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ── Back link ──────────────────────────────────────────── */
+.back-link {
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  background: none;
+  padding: 0;
+  transition: color 0.15s;
+}
+
+.back-link:hover {
+  color: var(--text);
+}
+
+/* ── Divider ────────────────────────────────────────────── */
+.divider {
+  height: 1px;
+  background: var(--border);
+  width: 100%;
+}
