@@ -2,7 +2,15 @@ import difflib
 import subprocess
 import tempfile
 import os
-from agent.context import RunContext, FilePatch
+from agent.context import RunContext, FilePatch, StepError
+
+
+def _safe_path(repo_path: str, rel_path: str) -> str:
+    resolved = os.path.realpath(os.path.join(repo_path, rel_path))
+    root = os.path.realpath(repo_path)
+    if not resolved.startswith(root + os.sep) and resolved != root:
+        raise StepError(f"diff_generator: path escapes repo root: {rel_path!r}")
+    return resolved
 
 
 def make_diff(patch: FilePatch) -> str:
@@ -23,7 +31,7 @@ def _dry_run_passes(diff: str, patch: FilePatch, repo_path: str) -> bool:
         f.write(diff)
         patch_file = f.name
     try:
-        target = os.path.join(repo_path, patch.path)
+        target = _safe_path(repo_path, patch.path)
         result = subprocess.run(
             ["patch", "--dry-run", "-p1", target, patch_file],
             capture_output=True,

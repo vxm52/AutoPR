@@ -1,7 +1,20 @@
 import os
+import re
 import git
 from github import Github  # PyGitHub package
 from agent.context import RunContext, StepError
+
+
+_SAFE_REPO_NAME_RE = re.compile(r"^[A-Za-z0-9_.\-]+$")
+
+
+def _safe_path(repo_path: str, rel_path: str) -> str:
+    """Resolve rel_path inside repo_path and raise StepError if it escapes."""
+    resolved = os.path.realpath(os.path.join(repo_path, rel_path))
+    root = os.path.realpath(repo_path)
+    if not resolved.startswith(root + os.sep) and resolved != root:
+        raise StepError(f"pr_creator: path escapes repo root: {rel_path!r}")
+    return resolved
 
 
 def _pick_branch_name(repo: git.Repo, base: str) -> str:
@@ -49,7 +62,7 @@ def run(ctx: RunContext) -> None:
         )
 
     for patch in ctx.patches:
-        full_path = os.path.join(ctx.repo_path, patch.path)
+        full_path = _safe_path(ctx.repo_path, patch.path)
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
         with open(full_path, "w") as f:
             f.write(patch.modified_content)
@@ -74,7 +87,8 @@ def run(ctx: RunContext) -> None:
         origin.set_url(auth_url)
         origin.push(refspec=f"{branch_name}:{branch_name}")
     except Exception as e:
-        raise StepError(f"pr_creator: push failed — {e}") from e
+        safe_msg = str(e).replace(token, "<token>")
+        raise StepError(f"pr_creator: push failed — {safe_msg}") from None
     finally:
         origin.set_url(original_url)
 
