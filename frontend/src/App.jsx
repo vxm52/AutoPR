@@ -333,16 +333,79 @@ function StatusBadge({ status }) {
 // ─── Mock pipeline preview (static visual, landing page only) ─────────────────
 
 const MOCK_STEPS_DATA = [
-  { label: 'Issue Parser',   status: 'done',    msg: 'Classified as bug_fix' },
-  { label: 'Repo Indexer',   status: 'done',    msg: '2,847 chunks indexed' },
-  { label: 'Retriever',      status: 'done',    msg: '4 relevant files found' },
-  { label: 'Planner',        status: 'done',    msg: 'Plan ready · high confidence' },
-  { label: 'Code Generator', status: 'running', msg: 'Writing AuthMiddleware.java…' },
+  { label: 'Issue Parser',   status: 'done',    msg: '' },
+  { label: 'Repo Indexer',   status: 'done',    msg: '' },
+  { label: 'Retriever',      status: 'done',    msg: '' },
+  { label: 'Planner',        status: 'done',    msg: '' },
+  { label: 'Code Generator', status: 'running', msg: 'Writing AuthMiddleware.java' },
   { label: 'Diff Generator', status: 'pending', msg: 'Pending' },
   { label: 'PR Creator',     status: 'pending', msg: 'Pending' },
 ]
 
+const MOCK_DONE_MSGS = [
+  'Classified as bug_fix',
+  '2,847 chunks indexed',
+  '4 relevant files found',
+  'Plan ready · high confidence',
+]
+
+const MOCK_DIFF_LINES = [
+  { cls: 'mock-diff-meta', g: null, text: '--- a/src/auth/AuthMiddleware.java' },
+  { cls: 'mock-diff-meta', g: null, text: '+++ b/src/auth/AuthMiddleware.java' },
+  { cls: 'mock-diff-hunk', g: null, text: '@@ -42,6 +42,8 @@ public class AuthMiddleware' },
+  { cls: 'mock-diff-del',  g: '-',  text: '  if (user.getSession() == null) {' },
+  { cls: 'mock-diff-add',  g: '+',  text: '  if (user == null || user.getSession() == null) {' },
+  { cls: 'mock-diff-add',  g: '+',  text: '    log.warn("null user encountered");' },
+  { cls: 'mock-diff-ctx',  g: ' ',  text: '    return Response.unauthorized();' },
+]
+
 function MockPipelinePanel() {
+  const [typed,       setTyped]       = useState(MOCK_DONE_MSGS.map(() => ''))
+  const [diffVisible, setDiffVisible] = useState(MOCK_DIFF_LINES.map(() => false))
+
+  // Typewriter: type each done-step message in sequence, 40ms/char, 500ms start delay
+  useEffect(() => {
+    let cancelled = false
+    const timers = []
+    let delay = 500
+    MOCK_DONE_MSGS.forEach((msg, i) => {
+      for (let c = 1; c <= msg.length; c++) {
+        const chars = c, idx = i
+        timers.push(setTimeout(() => {
+          if (cancelled) return
+          setTyped(prev => { const n = [...prev]; n[idx] = msg.slice(0, chars); return n })
+        }, delay))
+        delay += 40
+      }
+    })
+    return () => { cancelled = true; timers.forEach(clearTimeout) }
+  }, [])
+
+  // Diff staggered reveal loop: reveal one line every 300ms, hold 2s, fade all out, repeat
+  useEffect(() => {
+    let cancelled = false
+    const timers = []
+
+    function runCycle() {
+      if (cancelled) return
+      setDiffVisible(MOCK_DIFF_LINES.map(() => false))
+      MOCK_DIFF_LINES.forEach((_, i) => {
+        timers.push(setTimeout(() => {
+          if (cancelled) return
+          setDiffVisible(prev => { const n = [...prev]; n[i] = true; return n })
+        }, i * 300))
+      })
+      timers.push(setTimeout(() => {
+        if (cancelled) return
+        setDiffVisible(MOCK_DIFF_LINES.map(() => false))
+        timers.push(setTimeout(runCycle, 400))
+      }, (MOCK_DIFF_LINES.length - 1) * 300 + 2000))
+    }
+
+    runCycle()
+    return () => { cancelled = true; timers.forEach(clearTimeout) }
+  }, [])
+
   return (
     <div className="mock-panel">
       <div className="mock-titlebar">
@@ -364,19 +427,28 @@ function MockPipelinePanel() {
             </span>
             <span className="mock-step-num">{String(i + 1).padStart(2, '0')}</span>
             <span className="mock-step-label">{step.label}</span>
-            <span className="mock-step-msg">{step.msg}</span>
+            <span className="mock-step-msg">
+              {step.status === 'done'
+                ? typed[i]
+                : step.status === 'running'
+                  ? <>{step.msg}<span className="mock-cursor">▋</span></>
+                  : step.msg}
+            </span>
           </div>
         ))}
       </div>
 
       <div className="mock-diff-block">
-        <div className="mock-diff-line mock-diff-meta">{'--- a/src/auth/AuthMiddleware.java'}</div>
-        <div className="mock-diff-line mock-diff-meta">{'+++ b/src/auth/AuthMiddleware.java'}</div>
-        <div className="mock-diff-line mock-diff-hunk">{'@@ -42,6 +42,8 @@ public class AuthMiddleware'}</div>
-        <div className="mock-diff-line mock-diff-del"><span className="mock-diff-g">-</span>{'  if (user.getSession() == null) {'}</div>
-        <div className="mock-diff-line mock-diff-add"><span className="mock-diff-g">+</span>{'  if (user == null || user.getSession() == null) {'}</div>
-        <div className="mock-diff-line mock-diff-add"><span className="mock-diff-g">+</span>{'    log.warn("null user encountered");'}</div>
-        <div className="mock-diff-line mock-diff-ctx"><span className="mock-diff-g"> </span>{'    return Response.unauthorized();'}</div>
+        {MOCK_DIFF_LINES.map((line, i) => (
+          <div
+            key={i}
+            className={`mock-diff-line ${line.cls}`}
+            style={{ opacity: diffVisible[i] ? 1 : 0, transition: 'opacity 200ms' }}
+          >
+            {line.g !== null && <span className="mock-diff-g">{line.g}</span>}
+            {line.text}
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -559,6 +631,7 @@ function HomePage({ onRunStarted }) {
       <div className="hero">
         <div className="hero-glow" aria-hidden="true" />
         <div className="hero-scanlines" aria-hidden="true" />
+        <div className="hero-divider" aria-hidden="true" />
 
         <div className="hero-left">
           <div className="hero-badge">

@@ -108,9 +108,21 @@ ol, ul            { list-style: none; }
 .hero {
   display: grid;
   grid-template-columns: 55fr 45fr;
+  align-items: center;
   min-height: calc(100vh - 52px);
   position: relative;
   overflow: hidden;
+}
+
+.hero-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 55%;
+  width: 1px;
+  background: var(--border);
+  z-index: 3;
+  pointer-events: none;
 }
 
 /* Scanline texture overlay */
@@ -157,7 +169,6 @@ ol, ul            { list-style: none; }
   align-items: center;
   justify-content: center;
   padding: 48px 48px 48px 24px;
-  border-left: 1px solid var(--border);
 }
 
 @media (max-width: 900px) {
@@ -535,11 +546,23 @@ ol, ul            { list-style: none; }
 .mock-step-pending .mock-step-msg   { color: var(--dim); }
 
 .mock-running-dot {
+  position: relative;
   display: inline-block;
   width: 8px; height: 8px;
   border-radius: 50%;
   background: var(--blue);
-  animation: mock-pulse 1.3s ease-in-out infinite;
+  animation: mock-dot-pulse 1200ms ease-in-out infinite;
+}
+
+.mock-running-dot::before {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: rgba(96,165,250,0.5);
+  transform: translate(-50%, -50%) scale(1);
+  animation: mock-sonar 1200ms ease-in-out infinite;
 }
 
 .mock-pending-circle {
@@ -549,9 +572,24 @@ ol, ul            { list-style: none; }
   border: 1.5px solid var(--dim);
 }
 
-@keyframes mock-pulse {
-  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(96,165,250,0.5); }
-  50%       { opacity: 0.7; box-shadow: 0 0 0 5px rgba(96,165,250,0); }
+@keyframes mock-dot-pulse {
+  0%, 100% { transform: scale(1);   opacity: 1;   }
+  50%       { transform: scale(1.5); opacity: 0.3; }
+}
+
+@keyframes mock-sonar {
+  0%   { transform: translate(-50%, -50%) scale(1);   opacity: 0.6; }
+  100% { transform: translate(-50%, -50%) scale(3.5); opacity: 0;   }
+}
+
+/* Blinking cursor on active step message */
+.mock-cursor {
+  animation: mock-cursor-blink 1.06s step-end infinite;
+}
+
+@keyframes mock-cursor-blink {
+  from, to { opacity: 1; }
+  50%       { opacity: 0; }
 }
 
 /* Diff block at bottom of mock panel */
