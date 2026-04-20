@@ -468,35 +468,29 @@ function MockPipelinePanel() {
         })}
       </div>
 
-      {showPlan && (
-        <div className="mock-plan-block">
-          <span className="mock-plan-title">plan</span>
-          <div className="mock-plan-line">
-            <span className="mock-plan-sig">modify</span>
-            <span className="mock-plan-path">src/auth/AuthMiddleware.java</span>
-          </div>
-          <div className="mock-plan-desc">add null check before getSession() call</div>
+      <div className="mock-plan-block" style={{ opacity: showPlan ? 1 : 0, transition: 'opacity 0.25s ease' }}>
+        <span className="mock-plan-title">plan</span>
+        <div className="mock-plan-line">
+          <span className="mock-plan-sig">modify</span>
+          <span className="mock-plan-path">src/auth/AuthMiddleware.java</span>
         </div>
-      )}
+        <div className="mock-plan-desc">add null check before getSession() call</div>
+      </div>
 
-      {diffCount > 0 && (
-        <div className="mock-diff-block">
-          {MOCK_DIFF_LINES.slice(0, diffCount).map((line, i) => (
-            <div key={i} className={`mock-diff-line ${line.cls}`}>
-              {line.g !== null && <span className="mock-diff-g">{line.g}</span>}
-              {line.text}
-            </div>
-          ))}
-          {prDone && (
-            <div className="mock-pr-success">
-              <IconCheck />
-              <span>autopr/issue-42</span>
-              <span className="mock-pr-arrow">→</span>
-              <span className="mock-pr-url">github.com/org/repo/pull/47</span>
-            </div>
-          )}
+      <div className="mock-diff-block" style={{ opacity: diffCount > 0 ? 1 : 0, transition: 'opacity 0.14s ease' }}>
+        {MOCK_DIFF_LINES.map((line, i) => (
+          <div key={i} className={`mock-diff-line ${line.cls}`} style={{ opacity: i < diffCount ? 1 : 0, transition: 'opacity 0.14s ease' }}>
+            {line.g !== null && <span className="mock-diff-g">{line.g}</span>}
+            {line.text}
+          </div>
+        ))}
+        <div className="mock-pr-success" style={{ opacity: prDone ? 1 : 0, transition: 'opacity 0.3s ease' }}>
+          <IconCheck />
+          <span>autopr/issue-42</span>
+          <span className="mock-pr-arrow">→</span>
+          <span className="mock-pr-url">github.com/org/repo/pull/47</span>
         </div>
-      )}
+      </div>
     </div>
   )
 }

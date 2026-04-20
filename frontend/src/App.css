@@ -685,9 +685,6 @@ ol, ul            { list-style: none; }
 .mock-diff-add .mock-diff-g { color: var(--green); }
 .mock-diff-ctx .mock-diff-g { color: var(--dim); }
 
-/* Each newly-mounted diff line fades up */
-.mock-diff-line { animation: fade-up 0.14s ease both; }
-
 /* Step counter in titlebar */
 .mock-counter {
   margin-left: auto;
@@ -705,7 +702,6 @@ ol, ul            { list-style: none; }
   display: flex;
   flex-direction: column;
   gap: 5px;
-  animation: fade-up 0.25s ease both;
 }
 
 .mock-plan-title {
@@ -746,7 +742,6 @@ ol, ul            { list-style: none; }
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px solid rgba(74,222,128,0.12);
-  animation: fade-up 0.3s ease both;
 }
 
 .mock-pr-arrow { color: var(--dim); flex-shrink: 0; }
