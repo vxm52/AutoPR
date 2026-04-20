@@ -330,23 +330,139 @@ function StatusBadge({ status }) {
   )
 }
 
-// ─── How it works ─────────────────────────────────────────────────────────────
+// ─── Mock pipeline preview (static visual, landing page only) ─────────────────
+
+const MOCK_STEPS_DATA = [
+  { label: 'Issue Parser',   status: 'done',    msg: 'Classified as bug_fix' },
+  { label: 'Repo Indexer',   status: 'done',    msg: '2,847 chunks indexed' },
+  { label: 'Retriever',      status: 'done',    msg: '4 relevant files found' },
+  { label: 'Planner',        status: 'done',    msg: 'Plan ready · high confidence' },
+  { label: 'Code Generator', status: 'running', msg: 'Writing AuthMiddleware.java…' },
+  { label: 'Diff Generator', status: 'pending', msg: 'Pending' },
+  { label: 'PR Creator',     status: 'pending', msg: 'Pending' },
+]
+
+function MockPipelinePanel() {
+  return (
+    <div className="mock-panel">
+      <div className="mock-titlebar">
+        <div className="mock-lights">
+          <span className="mock-light mock-light-red" />
+          <span className="mock-light mock-light-yellow" />
+          <span className="mock-light mock-light-green" />
+        </div>
+        <span className="mock-title">autopr-run · issue #42</span>
+      </div>
+
+      <div className="mock-steps">
+        {MOCK_STEPS_DATA.map((step, i) => (
+          <div key={i} className={`mock-step mock-step-${step.status}`}>
+            <span className="mock-step-icon">
+              {step.status === 'done'    && <IconCheck />}
+              {step.status === 'running' && <span className="mock-running-dot" />}
+              {step.status === 'pending' && <span className="mock-pending-circle" />}
+            </span>
+            <span className="mock-step-num">{String(i + 1).padStart(2, '0')}</span>
+            <span className="mock-step-label">{step.label}</span>
+            <span className="mock-step-msg">{step.msg}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="mock-diff-block">
+        <div className="mock-diff-line mock-diff-meta">{'--- a/src/auth/AuthMiddleware.java'}</div>
+        <div className="mock-diff-line mock-diff-meta">{'+++ b/src/auth/AuthMiddleware.java'}</div>
+        <div className="mock-diff-line mock-diff-hunk">{'@@ -42,6 +42,8 @@ public class AuthMiddleware'}</div>
+        <div className="mock-diff-line mock-diff-del"><span className="mock-diff-g">-</span>{'  if (user.getSession() == null) {'}</div>
+        <div className="mock-diff-line mock-diff-add"><span className="mock-diff-g">+</span>{'  if (user == null || user.getSession() == null) {'}</div>
+        <div className="mock-diff-line mock-diff-add"><span className="mock-diff-g">+</span>{'    log.warn("null user encountered");'}</div>
+        <div className="mock-diff-line mock-diff-ctx"><span className="mock-diff-g"> </span>{'    return Response.unauthorized();'}</div>
+      </div>
+    </div>
+  )
+}
+
+// ─── How it works — animated pipeline ticker ─────────────────────────────────
+
+const HOW_ROWS = [PIPELINE_STEPS.slice(0, 4), PIPELINE_STEPS.slice(4)]
+
+const HOW_DESCS = [
+  'Classifies issue as bug fix, feature, or refactor',
+  'Builds a FAISS semantic index of the codebase',
+  'Finds the most relevant code chunks via vector search',
+  'Produces a structured JSON change plan via LLM',
+  'Writes updated files based on the plan',
+  'Computes unified diffs with dry-run validation',
+  'Commits, pushes, and opens a GitHub pull request',
+]
 
 function HowItWorks() {
+  const [activeStep,  setActiveStep]  = useState(0)
+  const [pulsingConn, setPulsingConn] = useState(null)
+  const prefersReduced = useRef(
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  )
+
+  useEffect(() => {
+    const ACTIVE_MS = 1500
+    const PULSE_MS  = 400
+    const total     = PIPELINE_STEPS.length
+    let mounted     = true
+    let t1 = null
+    let t2 = null
+
+    function tick(step) {
+      if (!mounted) return
+      setActiveStep(step)
+      setPulsingConn(null)
+
+      t1 = setTimeout(() => {
+        if (!mounted) return
+        const next = (step + 1) % total
+        if (!prefersReduced.current) setPulsingConn(step)
+        const delay = prefersReduced.current ? 0 : PULSE_MS
+        t2 = setTimeout(() => tick(next), delay)
+      }, ACTIVE_MS)
+    }
+
+    tick(0)
+    return () => { mounted = false; clearTimeout(t1); clearTimeout(t2) }
+  }, [])
+
   return (
     <section className="how">
       <p className="how-title">How it works</p>
-      <ol className="how-list">
-        {PIPELINE_STEPS.map((step, i) => (
-          <li key={step.id} className="how-item">
-            <span className="how-num">{String(i + 1).padStart(2, '0')}</span>
-            <div>
-              <span className="how-label">{step.label}</span>
-              <span className="how-desc">{step.desc}</span>
-            </div>
-          </li>
+      <div className="how-rows">
+        {HOW_ROWS.map((rowSteps, rowIdx) => (
+          <div key={rowIdx} className="how-ticker">
+            {rowSteps.map((step, j) => {
+              const i           = rowIdx === 0 ? j : j + 4
+              const isActive    = activeStep === i
+              const isPulsing   = pulsingConn === i
+              const isLastInRow = j === rowSteps.length - 1
+              return (
+                <div key={step.id} className="hw-node">
+                  <div className={`hw-step${isActive ? ' hw-step-active' : ''}`}>
+                    <span className="hw-num">{String(i + 1).padStart(2, '0')}</span>
+                    <span className="hw-label">{step.label}</span>
+                    <span className="hw-underline" />
+                    <span className="hw-desc">{HOW_DESCS[i]}</span>
+                  </div>
+                  {!isLastInRow && (
+                    <div className="hw-conn">
+                      <div className="hw-conn-track">
+                        <div className="hw-conn-line" />
+                        {isPulsing && <div className="hw-pulse" />}
+                      </div>
+                      <span className="hw-conn-arrow">→</span>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         ))}
-      </ol>
+      </div>
     </section>
   )
 }
@@ -391,10 +507,25 @@ function LogBlock({ lines }) {
 // ─── Home page ────────────────────────────────────────────────────────────────
 
 function HomePage({ onRunStarted }) {
-  const [repo, setRepo]     = useState('')
-  const [num, setNum]       = useState('')
-  const [loading, setLoad]  = useState(false)
-  const [error, setError]   = useState('')
+  const [repo, setRepo]    = useState('')
+  const [num, setNum]      = useState('')
+  const [loading, setLoad] = useState(false)
+  const [error, setError]  = useState('')
+  const [shimmer,    setShimmer]  = useState(false)
+  const shimmerTimer = useRef(null)
+  const wasReady     = useRef(false)
+
+  useEffect(() => {
+    const ready = !!repo && !!num
+    if (ready && !wasReady.current) {
+      wasReady.current = true
+      setShimmer(true)
+      clearTimeout(shimmerTimer.current)
+      shimmerTimer.current = setTimeout(() => setShimmer(false), 750)
+    } else if (!ready) {
+      wasReady.current = false
+    }
+  }, [repo, num])
 
   async function submit(e) {
     e.preventDefault()
@@ -424,37 +555,62 @@ function HomePage({ onRunStarted }) {
   }
 
   return (
-    <main className="page">
-      <div className="home-card">
-        <header className="home-hd">
-          <h1>AutoPR</h1>
-          <p>Point it at a GitHub issue.<br />Get a pull request back.</p>
-        </header>
+    <>
+      <div className="hero">
+        <div className="hero-glow" aria-hidden="true" />
+        <div className="hero-scanlines" aria-hidden="true" />
 
-        <form className="form" onSubmit={submit}>
-          <div className="field">
-            <label htmlFor="repo">Repository</label>
-            <input id="repo" type="text" placeholder="owner/repo"
-              value={repo} onChange={e => setRepo(e.target.value)}
-              disabled={loading} autoFocus autoComplete="off" spellCheck={false} />
+        <div className="hero-left">
+          <div className="hero-badge">
+            <span className="hero-badge-dot" />
+            AUTONOMOUS AGENT
           </div>
-          <div className="field">
-            <label htmlFor="num">Issue number</label>
-            <input id="num" type="number" placeholder="42" min="1"
-              value={num} onChange={e => setNum(e.target.value)}
-              disabled={loading} />
-          </div>
-          {error && <p className="form-error">{error}</p>}
-          <button className="btn-primary" type="submit" disabled={loading || !repo || !num}>
-            {loading ? 'Starting…' : 'Run AutoPR →'}
-          </button>
-        </form>
+          <h1 className="hero-headline">AutoPR</h1>
+          <p className="hero-subline">
+            Point it at a GitHub issue.<br />Get a pull request back.
+          </p>
 
-        <IssuePreview repo={repo} issueNumber={num} />
+          <form className="terminal-form" onSubmit={submit}>
+            <div className="t-line">
+              <span className="t-prompt">$</span>
+              <span className="t-cmd"> autopr </span>
+              <span className="t-flag">--repo </span>
+              <input
+                id="repo" type="text" className="t-input"
+                placeholder="owner/repo"
+                value={repo} onChange={e => setRepo(e.target.value)}
+                disabled={loading} autoFocus autoComplete="off" spellCheck={false}
+              />
+            </div>
+            <div className="t-line">
+              <span className="t-prompt">$</span>
+              <span className="t-cmd"> autopr </span>
+              <span className="t-flag">--issue </span>
+              <input
+                id="num" type="number" className="t-input t-input-num"
+                placeholder="#42" min="1"
+                value={num} onChange={e => setNum(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+            {error && <p className="form-error">{error}</p>}
+            <button className={`btn-run${shimmer ? ' btn-run-shimmer' : ''}`} type="submit" disabled={loading}>
+              {loading ? '▶ starting…' : 'Run →'}
+            </button>
+          </form>
+
+          <div className="issue-preview-slot">
+            <IssuePreview repo={repo} issueNumber={num} />
+          </div>
+        </div>
+
+        <div className="hero-right">
+          <MockPipelinePanel />
+        </div>
       </div>
 
       <HowItWorks />
-    </main>
+    </>
   )
 }
 
