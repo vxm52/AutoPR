@@ -330,81 +330,108 @@ function StatusBadge({ status }) {
   )
 }
 
-// ─── Mock pipeline preview (static visual, landing page only) ─────────────────
+// ─── Mock pipeline preview (animated, landing page only) ─────────────────────
 
-const MOCK_STEPS_DATA = [
-  { label: 'Issue Parser',   status: 'done',    msg: '' },
-  { label: 'Repo Indexer',   status: 'done',    msg: '' },
-  { label: 'Retriever',      status: 'done',    msg: '' },
-  { label: 'Planner',        status: 'done',    msg: '' },
-  { label: 'Code Generator', status: 'running', msg: 'Writing AuthMiddleware.java' },
-  { label: 'Diff Generator', status: 'pending', msg: 'Pending' },
-  { label: 'PR Creator',     status: 'pending', msg: 'Pending' },
+const STEP_DURATIONS  = [700, 1500, 950, 1300, 2200, 650, 1100] // ms per step
+
+const STEP_RUNNING_MSGS = [
+  'parsing issue body',
+  'embedding 2,847 chunks',
+  'querying vector index',
+  'generating JSON plan',
+  'writing AuthMiddleware.java',
+  'diffing 1 file',
+  'pushing autopr/issue-42',
 ]
 
-const MOCK_DONE_MSGS = [
-  'Classified as bug_fix',
+const STEP_DONE_MSGS = [
+  'classified: bug_fix',
   '2,847 chunks indexed',
-  '4 relevant files found',
-  'Plan ready · high confidence',
+  '4 files · score 0.91',
+  'high confidence',
+  '1 file patched',
+  '+14 −4 · 3 hunks',
+  'PR #47 opened',
 ]
 
 const MOCK_DIFF_LINES = [
   { cls: 'mock-diff-meta', g: null, text: '--- a/src/auth/AuthMiddleware.java' },
   { cls: 'mock-diff-meta', g: null, text: '+++ b/src/auth/AuthMiddleware.java' },
-  { cls: 'mock-diff-hunk', g: null, text: '@@ -42,6 +42,8 @@ public class AuthMiddleware' },
-  { cls: 'mock-diff-del',  g: '-',  text: '  if (user.getSession() == null) {' },
-  { cls: 'mock-diff-add',  g: '+',  text: '  if (user == null || user.getSession() == null) {' },
-  { cls: 'mock-diff-add',  g: '+',  text: '    log.warn("null user encountered");' },
-  { cls: 'mock-diff-ctx',  g: ' ',  text: '    return Response.unauthorized();' },
+  { cls: 'mock-diff-hunk', g: null, text: '@@ -38,9 +38,15 @@ AuthMiddleware {' },
+  { cls: 'mock-diff-ctx',  g: ' ',  text: '  public Response handle(Request req) {' },
+  { cls: 'mock-diff-del',  g: '-',  text: '    User user = sessions.get(req.token());' },
+  { cls: 'mock-diff-del',  g: '-',  text: '    if (user.getSession() == null) {' },
+  { cls: 'mock-diff-add',  g: '+',  text: '    if (req.token() == null) {' },
+  { cls: 'mock-diff-add',  g: '+',  text: '      log.warn("missing auth token");' },
+  { cls: 'mock-diff-add',  g: '+',  text: '      return Response.unauthorized();' },
+  { cls: 'mock-diff-add',  g: '+',  text: '    }' },
+  { cls: 'mock-diff-add',  g: '+',  text: '    User user = sessions.get(req.token());' },
+  { cls: 'mock-diff-add',  g: '+',  text: '    if (user == null || user.getSession() == null) {' },
+  { cls: 'mock-diff-add',  g: '+',  text: '      log.warn("null user or session");' },
+  { cls: 'mock-diff-ctx',  g: ' ',  text: '      return Response.unauthorized();' },
+  { cls: 'mock-diff-ctx',  g: ' ',  text: '    }' },
+  { cls: 'mock-diff-ctx',  g: ' ',  text: '    return chain.next(req.withUser(user));' },
 ]
 
 function MockPipelinePanel() {
-  const [typed,       setTyped]       = useState(MOCK_DONE_MSGS.map(() => ''))
-  const [diffVisible, setDiffVisible] = useState(MOCK_DIFF_LINES.map(() => false))
+  const [stepStates, setStepStates] = useState(PIPELINE_STEPS.map(() => 'pending'))
+  const [stepMsgs,   setStepMsgs]   = useState(PIPELINE_STEPS.map(() => ''))
+  const [showPlan,   setShowPlan]   = useState(false)
+  const [diffCount,  setDiffCount]  = useState(0)
+  const [prDone,     setPrDone]     = useState(false)
 
-  // Typewriter: type each done-step message in sequence, 40ms/char, 500ms start delay
   useEffect(() => {
     let cancelled = false
-    const timers = []
-    let delay = 500
-    MOCK_DONE_MSGS.forEach((msg, i) => {
-      for (let c = 1; c <= msg.length; c++) {
-        const chars = c, idx = i
-        timers.push(setTimeout(() => {
-          if (cancelled) return
-          setTyped(prev => { const n = [...prev]; n[idx] = msg.slice(0, chars); return n })
-        }, delay))
-        delay += 40
-      }
-    })
-    return () => { cancelled = true; timers.forEach(clearTimeout) }
-  }, [])
+    const timers  = []
 
-  // Diff staggered reveal loop: reveal one line every 300ms, hold 2s, fade all out, repeat
-  useEffect(() => {
-    let cancelled = false
-    const timers = []
+    function go(fn, delay) {
+      const t = setTimeout(() => { if (!cancelled) fn() }, delay)
+      timers.push(t)
+    }
 
     function runCycle() {
       if (cancelled) return
-      setDiffVisible(MOCK_DIFF_LINES.map(() => false))
-      MOCK_DIFF_LINES.forEach((_, i) => {
-        timers.push(setTimeout(() => {
-          if (cancelled) return
-          setDiffVisible(prev => { const n = [...prev]; n[i] = true; return n })
-        }, i * 300))
+      setStepStates(PIPELINE_STEPS.map(() => 'pending'))
+      setStepMsgs(PIPELINE_STEPS.map(() => ''))
+      setShowPlan(false)
+      setDiffCount(0)
+      setPrDone(false)
+
+      let delay = 600
+      const startAt = []
+
+      PIPELINE_STEPS.forEach((_, i) => {
+        startAt.push(delay)
+        const s = delay, e = delay + STEP_DURATIONS[i]
+
+        go(() => {
+          setStepStates(p => { const n=[...p]; n[i]='running'; return n })
+          setStepMsgs(p   => { const n=[...p]; n[i]=STEP_RUNNING_MSGS[i]; return n })
+        }, s)
+
+        go(() => {
+          setStepStates(p => { const n=[...p]; n[i]='done'; return n })
+          setStepMsgs(p   => { const n=[...p]; n[i]=STEP_DONE_MSGS[i]; return n })
+          if (i === 3) go(() => setShowPlan(true), 200)
+          if (i === PIPELINE_STEPS.length - 1) go(() => setPrDone(true), 350)
+        }, e)
+
+        delay = e
       })
-      timers.push(setTimeout(() => {
-        if (cancelled) return
-        setDiffVisible(MOCK_DIFF_LINES.map(() => false))
-        timers.push(setTimeout(runCycle, 400))
-      }, (MOCK_DIFF_LINES.length - 1) * 300 + 2000))
+
+      // Diff lines reveal during code_generator (step 4)
+      const diffStart = startAt[4] + 200
+      MOCK_DIFF_LINES.forEach((_, i) => go(() => setDiffCount(i + 1), diffStart + i * 120))
+
+      // Loop: hold success state 4s then restart
+      go(() => { setPrDone(false); go(runCycle, 600) }, delay + 4200)
     }
 
     runCycle()
     return () => { cancelled = true; timers.forEach(clearTimeout) }
   }, [])
+
+  const doneCount = stepStates.filter(s => s === 'done').length
 
   return (
     <div className="mock-panel">
@@ -415,125 +442,86 @@ function MockPipelinePanel() {
           <span className="mock-light mock-light-green" />
         </div>
         <span className="mock-title">autopr-run · issue #42</span>
+        <span className="mock-counter">{doneCount}/{PIPELINE_STEPS.length}</span>
       </div>
 
       <div className="mock-steps">
-        {MOCK_STEPS_DATA.map((step, i) => (
-          <div key={i} className={`mock-step mock-step-${step.status}`}>
-            <span className="mock-step-icon">
-              {step.status === 'done'    && <IconCheck />}
-              {step.status === 'running' && <span className="mock-running-dot" />}
-              {step.status === 'pending' && <span className="mock-pending-circle" />}
-            </span>
-            <span className="mock-step-num">{String(i + 1).padStart(2, '0')}</span>
-            <span className="mock-step-label">{step.label}</span>
-            <span className="mock-step-msg">
-              {step.status === 'done'
-                ? typed[i]
-                : step.status === 'running'
-                  ? <>{step.msg}<span className="mock-cursor">▋</span></>
-                  : step.msg}
-            </span>
-          </div>
-        ))}
+        {PIPELINE_STEPS.map((step, i) => {
+          const state = stepStates[i]
+          const msg   = stepMsgs[i]
+          return (
+            <div key={i} className={`mock-step mock-step-${state}`}>
+              <span className="mock-step-icon">
+                {state === 'done'    && <IconCheck />}
+                {state === 'running' && <span className="mock-running-dot" />}
+                {state === 'pending' && <span className="mock-pending-circle" />}
+              </span>
+              <span className="mock-step-num">{String(i + 1).padStart(2, '0')}</span>
+              <span className="mock-step-label">{step.label}</span>
+              <span className="mock-step-msg">
+                {state === 'running'
+                  ? <>{msg}<span className="mock-cursor">▋</span></>
+                  : msg}
+              </span>
+            </div>
+          )
+        })}
       </div>
 
-      <div className="mock-diff-block">
-        {MOCK_DIFF_LINES.map((line, i) => (
-          <div
-            key={i}
-            className={`mock-diff-line ${line.cls}`}
-            style={{ opacity: diffVisible[i] ? 1 : 0, transition: 'opacity 200ms' }}
-          >
-            {line.g !== null && <span className="mock-diff-g">{line.g}</span>}
-            {line.text}
+      {showPlan && (
+        <div className="mock-plan-block">
+          <span className="mock-plan-title">plan</span>
+          <div className="mock-plan-line">
+            <span className="mock-plan-sig">modify</span>
+            <span className="mock-plan-path">src/auth/AuthMiddleware.java</span>
           </div>
-        ))}
-      </div>
+          <div className="mock-plan-desc">add null check before getSession() call</div>
+        </div>
+      )}
+
+      {diffCount > 0 && (
+        <div className="mock-diff-block">
+          {MOCK_DIFF_LINES.slice(0, diffCount).map((line, i) => (
+            <div key={i} className={`mock-diff-line ${line.cls}`}>
+              {line.g !== null && <span className="mock-diff-g">{line.g}</span>}
+              {line.text}
+            </div>
+          ))}
+          {prDone && (
+            <div className="mock-pr-success">
+              <IconCheck />
+              <span>autopr/issue-42</span>
+              <span className="mock-pr-arrow">→</span>
+              <span className="mock-pr-url">github.com/org/repo/pull/47</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
 
-// ─── How it works — animated pipeline ticker ─────────────────────────────────
-
-const HOW_ROWS = [PIPELINE_STEPS.slice(0, 4), PIPELINE_STEPS.slice(4)]
-
-const HOW_DESCS = [
-  'Classifies issue as bug fix, feature, or refactor',
-  'Builds a FAISS semantic index of the codebase',
-  'Finds the most relevant code chunks via vector search',
-  'Produces a structured JSON change plan via LLM',
-  'Writes updated files based on the plan',
-  'Computes unified diffs with dry-run validation',
-  'Commits, pushes, and opens a GitHub pull request',
-]
+// ─── How it works — 3-phase overview ─────────────────────────────────────────
 
 function HowItWorks() {
-  const [activeStep,  setActiveStep]  = useState(0)
-  const [pulsingConn, setPulsingConn] = useState(null)
-  const prefersReduced = useRef(
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  )
-
-  useEffect(() => {
-    const ACTIVE_MS = 1500
-    const PULSE_MS  = 400
-    const total     = PIPELINE_STEPS.length
-    let mounted     = true
-    let t1 = null
-    let t2 = null
-
-    function tick(step) {
-      if (!mounted) return
-      setActiveStep(step)
-      setPulsingConn(null)
-
-      t1 = setTimeout(() => {
-        if (!mounted) return
-        const next = (step + 1) % total
-        if (!prefersReduced.current) setPulsingConn(step)
-        const delay = prefersReduced.current ? 0 : PULSE_MS
-        t2 = setTimeout(() => tick(next), delay)
-      }, ACTIVE_MS)
-    }
-
-    tick(0)
-    return () => { mounted = false; clearTimeout(t1); clearTimeout(t2) }
-  }, [])
-
   return (
     <section className="how">
-      <p className="how-title">How it works</p>
-      <div className="how-rows">
-        {HOW_ROWS.map((rowSteps, rowIdx) => (
-          <div key={rowIdx} className="how-ticker">
-            {rowSteps.map((step, j) => {
-              const i           = rowIdx === 0 ? j : j + 4
-              const isActive    = activeStep === i
-              const isPulsing   = pulsingConn === i
-              const isLastInRow = j === rowSteps.length - 1
-              return (
-                <div key={step.id} className="hw-node">
-                  <div className={`hw-step${isActive ? ' hw-step-active' : ''}`}>
-                    <span className="hw-num">{String(i + 1).padStart(2, '0')}</span>
-                    <span className="hw-label">{step.label}</span>
-                    <span className="hw-underline" />
-                    <span className="hw-desc">{HOW_DESCS[i]}</span>
-                  </div>
-                  {!isLastInRow && (
-                    <div className="hw-conn">
-                      <div className="hw-conn-track">
-                        <div className="hw-conn-line" />
-                        {isPulsing && <div className="hw-pulse" />}
-                      </div>
-                      <span className="hw-conn-arrow">→</span>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        ))}
+      <div className="how-phase">
+        <span className="how-phase-num">01</span>
+        <span className="how-phase-label">Submit an issue</span>
+        <p className="how-phase-desc">Paste a GitHub repo and issue number. AutoPR fetches the issue and classifies the task type.</p>
+      </div>
+      <span className="how-arrow" aria-hidden="true">→</span>
+      <div className="how-phase">
+        <span className="how-phase-num">02</span>
+        <span className="how-phase-label">Agent runs the pipeline</span>
+        <p className="how-phase-desc">7 steps: index the repo, retrieve relevant files, plan the changes, generate patches, and validate diffs.</p>
+      </div>
+      <span className="how-arrow" aria-hidden="true">→</span>
+      <div className="how-phase">
+        <span className="how-phase-num">03</span>
+        <span className="how-phase-label">Review your PR</span>
+        <p className="how-phase-desc">AutoPR commits the changes to a new branch and opens a pull request on GitHub for you to review.</p>
       </div>
     </section>
   )

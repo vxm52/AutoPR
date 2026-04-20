@@ -108,10 +108,9 @@ ol, ul            { list-style: none; }
 .hero {
   display: grid;
   grid-template-columns: 55fr 45fr;
-  align-items: center;
-  min-height: calc(100vh - 52px);
+  align-items: flex-start;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .hero-divider {
@@ -158,26 +157,87 @@ ol, ul            { list-style: none; }
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  padding: clamp(72px, calc(50vh - 220px), 240px) 56px 80px 80px;
+  padding: 90px 56px 80px 80px;
   max-width: 680px;
+  min-width: 0;
 }
 
 .hero-right {
-  position: relative;
+  position: sticky;
+  top: 52px;
   z-index: 2;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  align-self: flex-start;
   justify-content: center;
-  padding: 48px 48px 48px 24px;
+  padding: 90px 48px 48px 24px;
+  min-width: 0;
 }
 
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+
+/* Tablet / stacked hero (≤ 900px) */
 @media (max-width: 900px) {
-  .hero {
-    grid-template-columns: 1fr;
-    min-height: unset;
+  .hero { grid-template-columns: 1fr; }
+
+  .hero-divider { display: none; }
+
+  .hero-left {
+    padding: 56px 32px 40px;
+    max-width: 100%;
   }
-  .hero-left  { padding: 56px 32px 40px; max-width: 100%; }
-  .hero-right { border-left: none; border-top: 1px solid var(--border); padding: 40px 32px 56px; }
+
+  .hero-right {
+    position: relative;   /* undo sticky — don't trap the panel on mobile scroll */
+    top: auto;
+    border-top: 1px solid var(--border);
+    padding: 40px 32px 56px;
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .mock-panel { max-width: 100%; }
+}
+
+/* Large phones (≤ 600px) */
+@media (max-width: 600px) {
+  .navbar { padding: 0 20px; }
+
+  .page { padding: 40px 20px 60px; }
+
+  .hero-left  { padding: 48px 20px 32px; }
+  .hero-right { padding: 32px 20px 48px; }
+
+  .hero-headline { letter-spacing: -1.5px; }
+  .hero-subline  { font-size: 16px; margin-bottom: 28px; }
+
+  /* Terminal form — tighten prefix so input gets more room */
+  .t-cmd { display: none; }
+
+  /* Mock panel — hide per-step message column; it's too cramped */
+  .mock-step-msg { display: none; }
+
+  /* Mock diff — smaller font so long code lines fit without overflow */
+  .mock-diff-line { font-size: 10px; }
+  .mock-diff-block { padding: 10px 14px; }
+
+  /* Plan block indent */
+  .mock-plan-desc { padding-left: 14px; }
+
+  /* How section */
+  .how { padding: 40px 20px; }
+}
+
+/* Small phones (≤ 400px) */
+@media (max-width: 400px) {
+  .hero-left  { padding: 40px 16px 28px; }
+  .hero-right { padding: 28px 16px 40px; }
+
+  .hero-headline { letter-spacing: -1px; }
+
+  .navbar { padding: 0 16px; }
+  .page   { padding: 36px 16px 56px; }
+  .how    { padding: 36px 16px; }
 }
 
 /* ── Hero text ───────────────────────────────────────────────────────────── */
@@ -209,7 +269,7 @@ ol, ul            { list-style: none; }
 
 .hero-headline {
   font-family: var(--mono);
-  font-size: 72px;
+  font-size: clamp(36px, 7.5vw, 72px);
   font-weight: 700;
   letter-spacing: -3px;
   line-height: 0.95;
@@ -625,224 +685,138 @@ ol, ul            { list-style: none; }
 .mock-diff-add .mock-diff-g { color: var(--green); }
 .mock-diff-ctx .mock-diff-g { color: var(--dim); }
 
-/* ── How it works — animated pipeline ticker ─────────────────────────────── */
+/* Each newly-mounted diff line fades up */
+.mock-diff-line { animation: fade-up 0.14s ease both; }
 
-.how {
-  width: 100%;
-  padding: 80px 40px;
-  border-top: 1px solid var(--border);
-}
-
-.how-title {
+/* Step counter in titlebar */
+.mock-counter {
+  margin-left: auto;
   font-family: var(--mono);
   font-size: 11px;
-  font-weight: 600;
-  color: var(--muted);
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  margin-bottom: 40px;
-  text-align: center;
-}
-
-/* Two-row wrapper */
-.how-rows {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 24px;
-  width: 100%;
-}
-
-/* Ticker row */
-.how-ticker {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow-x: auto;
-  scrollbar-width: none;
-  padding-bottom: 4px;
-}
-
-.how-ticker::-webkit-scrollbar { display: none; }
-
-.hw-node {
-  display: flex;
-  align-items: center;
+  color: var(--dim);
   flex-shrink: 0;
 }
 
-/* Step cell */
-.hw-step {
+/* Plan block — appears after planner completes */
+.mock-plan-block {
+  padding: 10px 18px 12px;
+  border-top: 1px solid var(--border);
+  background: rgba(167,139,250,0.03);
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 10px 8px;
-  border-radius: 6px;
-  cursor: default;
-  flex-shrink: 0;
-  transition: background 0.5s;
+  gap: 5px;
+  animation: fade-up 0.25s ease both;
 }
 
-.hw-step-active { background: rgba(59,130,246,0.07); }
-
-.hw-num {
+.mock-plan-title {
   font-family: var(--mono);
   font-size: 10px;
   font-weight: 600;
-  color: var(--dim);
-  transition: color 0.45s;
-  user-select: none;
-  line-height: 1;
+  letter-spacing: 1.1px;
+  color: rgba(167,139,250,0.7);
+  text-transform: uppercase;
 }
 
-.hw-step-active .hw-num { color: #3b82f6; }
-
-.hw-label {
+.mock-plan-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   font-family: var(--mono);
-  font-size: 12.5px;
-  font-weight: 500;
-  color: #374151;
-  transition: color 0.45s, text-shadow 0.45s;
-  white-space: nowrap;
-  user-select: none;
-  line-height: 1;
+  font-size: 12px;
 }
 
-.hw-step-active .hw-label {
-  color: #f5f5ff;
-  text-shadow: 0 0 18px rgba(59,130,246,0.55);
-}
+.mock-plan-sig  { color: var(--amber); font-size: 11px; flex-shrink: 0; }
+.mock-plan-path { color: var(--text); }
 
-/* Blue underline — always in DOM, revealed via CSS so no reflow */
-.hw-underline {
-  width: 18px;
-  height: 2px;
-  background: #3b82f6;
-  border-radius: 1px;
-  opacity: 0;
-  transform: scaleX(0);
-  transition: opacity 0.25s, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-  flex-shrink: 0;
-}
-
-.hw-step-active .hw-underline {
-  opacity: 1;
-  transform: scaleX(1);
-}
-
-/* Description — always in DOM, fades with opacity only */
-.hw-desc {
+.mock-plan-desc {
   font-family: var(--mono);
   font-size: 11px;
-  line-height: 1.35;
   color: var(--muted);
-  text-align: center;
-  white-space: normal;
-  max-width: 130px;
-  min-height: 46px;
-  opacity: 0;
-  transition: opacity 0.35s;
-  pointer-events: none;
-  user-select: none;
+  padding-left: 50px;
 }
 
-.hw-step-active .hw-desc { opacity: 1; }
-
-/* Connector — align-self: flex-start + margin-top nudges it to the label row */
-.hw-conn {
+/* PR success line at bottom of diff block */
+.mock-pr-success {
   display: flex;
   align-items: center;
-  gap: 0;
-  flex-shrink: 0;
-  padding: 0 2px;
-  align-self: flex-start;
-  margin-top: 22px; /* skip past: padding(8) + num(~12) + gap(4) → top of label */
-}
-
-.hw-conn-track {
-  position: relative;
-  width: 44px;
-  height: 14px;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.hw-conn-line {
-  position: absolute;
-  top: 50%;
-  left: 0; right: 0;
-  height: 1px;
-  background: #1a1a2c;
-  transform: translateY(-50%);
-}
-
-.hw-conn-arrow {
+  gap: 7px;
   font-family: var(--mono);
   font-size: 11px;
-  color: #1a1a2c;
+  color: var(--green);
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(74,222,128,0.12);
+  animation: fade-up 0.3s ease both;
+}
+
+.mock-pr-arrow { color: var(--dim); flex-shrink: 0; }
+.mock-pr-url   {
+  color: var(--blue);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* ── How it works — 3-phase overview ─────────────────────────────────────── */
+
+.how {
+  width: 100%;
+  padding: 48px 80px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0;
+}
+
+.how-phase {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  max-width: 280px;
+  padding: 0 32px;
+}
+
+.how-phase:first-child { padding-left: 0; }
+.how-phase:last-child  { padding-right: 0; }
+
+.how-phase-num {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--blue);
+  letter-spacing: 0.5px;
+}
+
+.how-phase-label {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.2px;
+}
+
+.how-phase-desc {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.how-arrow {
+  font-family: var(--mono);
+  font-size: 16px;
+  color: var(--dim);
+  padding-top: 28px;
   flex-shrink: 0;
   user-select: none;
-  line-height: 1;
 }
 
-/* Traveling pulse — laser streak */
-.hw-pulse {
-  position: absolute;
-  top: 50%;
-  left: -22px;
-  transform: translateY(-50%);
-  width: 22px;
-  height: 3px;
-  background: linear-gradient(90deg, transparent, #3b82f6, #93c5fd, #3b82f6, transparent);
-  border-radius: 2px;
-  animation: hw-travel 400ms cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
-}
-
-@keyframes hw-travel {
-  0%   { left: -22px; }
-  100% { left: calc(100% + 4px); }
-}
-
-/* Reduced motion: skip pulse, just cross-fade the highlight */
-@media (prefers-reduced-motion: reduce) {
-  .hw-step    { transition: background 0.3s; }
-  .hw-label   { transition: color 0.3s; text-shadow: none !important; }
-  .hw-num     { transition: color 0.3s; }
-  .hw-underline { animation: none; width: 18px; opacity: 1; }
-}
-
-/* Mobile: vertical stack */
 @media (max-width: 768px) {
-  .how { padding: 56px 24px; }
-
-  .how-rows { gap: 0; }
-
-  .how-ticker {
-    flex-direction: column;
-    align-items: stretch;
-    overflow-x: visible;
-  }
-
-  .hw-node {
-    flex-direction: row;
-    align-items: center;
-    width: 100%;
-  }
-
-  .hw-step {
-    flex-direction: row;
-    gap: 10px;
-    padding: 10px 14px;
-    width: 100%;
-    align-items: center;
-    border-radius: 6px;
-  }
-
-  .hw-underline { display: none; }
-  .hw-desc      { display: none; }
-
-  .hw-conn { display: none; }
+  .how { flex-direction: column; gap: 28px; }
+  .how-phase { max-width: 100%; padding: 0; }
+  .how-arrow { display: none; }
 }
 
 /* ── Status page layout ──────────────────────────────────────────────────── */
