@@ -17,15 +17,27 @@ const PIPELINE_STEPS = [
 
 function parseStepStates(stepLog, pipelineStatus) {
   const states = {}
+  const warned = new Set()
+
   for (const line of stepLog) {
     const u = line.toUpperCase()
     for (const step of PIPELINE_STEPS) {
       if (!line.includes(step.id)) continue
-      if (u.startsWith('OK')   && states[step.id] !== 'warn') { states[step.id] = 'ok';   break }
-      if (u.startsWith('WARN'))                                { states[step.id] = 'warn'; break }
-      if (u.startsWith('ERR'))                                 { states[step.id] = 'err';  break }
+      if (u.startsWith('OK')) {
+        // Green wins on completion; amber overlay if there were earlier warnings.
+        states[step.id] = warned.has(step.id) ? 'ok-warn' : 'ok'
+        break
+      }
+      if (u.startsWith('WARN')) {
+        warned.add(step.id)
+        // Only downgrade to amber if not already settled green.
+        if (states[step.id] !== 'ok' && states[step.id] !== 'ok-warn') states[step.id] = 'warn'
+        break
+      }
+      if (u.startsWith('ERR')) { states[step.id] = 'err'; break }
     }
   }
+
   if (pipelineStatus === 'running' || pipelineStatus === 'pending') {
     for (const step of PIPELINE_STEPS) {
       if (!states[step.id]) { states[step.id] = 'active'; break }
@@ -35,7 +47,7 @@ function parseStepStates(stepLog, pipelineStatus) {
 }
 
 function countDone(states) {
-  return PIPELINE_STEPS.filter(s => ['ok', 'warn'].includes(states[s.id])).length
+  return PIPELINE_STEPS.filter(s => ['ok', 'ok-warn', 'warn'].includes(states[s.id])).length
 }
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -112,9 +124,9 @@ function ProgressBar({ states, status }) {
 function PipelineDot({ state }) {
   return (
     <div className={`pip-dot pip-dot-${state}`}>
-      {state === 'ok'   && <IconCheck />}
-      {state === 'warn' && <IconCheck />}
-      {state === 'err'  && <IconX />}
+      {(state === 'ok' || state === 'ok-warn') && <IconCheck />}
+      {state === 'err' && <IconX />}
+      {state === 'ok-warn' && <span className="pip-warn-dot" />}
     </div>
   )
 }
@@ -141,7 +153,7 @@ function PipelineVisualizer({ stepLog, status }) {
                 {!isLast && <div className={`pip-line ${lineFilled ? 'pip-line-on' : ''}`} />}
               </div>
               <div className={`pip-info ${state === 'active' ? 'pip-info-active' : ''}`}>
-                <span className={`pip-label pip-label-${state}`}>{step.label}</span>
+                <span className={`pip-label pip-label-${state === 'ok-warn' ? 'ok' : state}`}>{step.label}</span>
                 <span className="pip-desc">{step.desc}</span>
               </div>
             </div>
@@ -284,6 +296,27 @@ function DiffViewer({ diffs }) {
   )
 }
 
+// ─── PR links bar ─────────────────────────────────────────────────────────────
+
+function PrLinksBar({ prUrl, repo, issueNumber }) {
+  const issueUrl = `https://github.com/${repo}/issues/${issueNumber}`
+  return (
+    <div className="pr-links-bar">
+      {prUrl
+        ? <a className="pr-cta" href={prUrl} target="_blank" rel="noopener noreferrer">
+            View Pull Request <IconExternal />
+          </a>
+        : <span className="pr-cta-idle" aria-disabled="true">
+            View Pull Request <IconExternal />
+          </span>
+      }
+      <a className="issue-link" href={issueUrl} target="_blank" rel="noopener noreferrer">
+        View Issue on GitHub <IconExternal />
+      </a>
+    </div>
+  )
+}
+
 // ─── Status badge ─────────────────────────────────────────────────────────────
 
 const STATUS_LABEL = { pending: 'Pending', running: 'Running', done: 'Complete', failed: 'Failed' }
@@ -347,7 +380,7 @@ function LogBlock({ lines }) {
       <div className="log-body">
         {lines.length === 0
           ? <span className="log-empty">Waiting for pipeline…</span>
-          : lines.map((ln, i) => <LogLine key={i} line={ln} idx={i} />)
+          : lines.map((ln, i) => <LogLine key={ln} line={ln} idx={i} />)
         }
         <div ref={endRef} />
       </div>
@@ -435,18 +468,24 @@ function StatusPage({ runId, repo, issueNumber, onBack }) {
   const active         = run.status === 'running' || run.status === 'pending'
 
   useEffect(() => {
+    let cancelled = false
+
     async function poll() {
+      if (cancelled) return
       try {
         const res = await fetch(`/status/${runId}`)
         if (!res.ok) return
         const d = await res.json()
+        console.log('[poll]', d.status, 'step_log:', d.step_log)
+        if (cancelled) return
         setRun(d)
-        if (d.status === 'done' || d.status === 'failed') clearInterval(pollRef.current)
+        if (d.status === 'done' || d.status === 'failed') return
       } catch (_) {}
+      if (!cancelled) pollRef.current = setTimeout(poll, 500)
     }
+
     poll()
-    pollRef.current = setInterval(poll, 2000)
-    return () => clearInterval(pollRef.current)
+    return () => { cancelled = true; clearTimeout(pollRef.current) }
   }, [runId])
 
   return (
@@ -468,6 +507,8 @@ function StatusPage({ runId, repo, issueNumber, onBack }) {
 
           <PipelineVisualizer stepLog={run.step_log} status={run.status} />
 
+          <PrLinksBar prUrl={run.pr_url} repo={repo} issueNumber={issueNumber} />
+
           <LogBlock lines={run.step_log} />
 
           {run.diffs?.length > 0 && <DiffViewer diffs={run.diffs} />}
@@ -477,12 +518,6 @@ function StatusPage({ runId, repo, issueNumber, onBack }) {
               <p className="errors-title">Errors</p>
               {run.errors.map((e, i) => <p key={i} className="errors-msg">{e}</p>)}
             </div>
-          )}
-
-          {run.status === 'done' && run.pr_url && (
-            <a className="pr-cta" href={run.pr_url} target="_blank" rel="noopener noreferrer">
-              View Pull Request <IconExternal />
-            </a>
           )}
 
           {settled && (

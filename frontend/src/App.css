@@ -454,6 +454,24 @@ ol, ul            { list-style: none; }
   color: var(--green);
 }
 
+.pip-dot-ok-warn {
+  border-color: var(--green);
+  background: rgba(74,222,128,0.12);
+  color: var(--green);
+}
+
+.pip-warn-dot {
+  position: absolute;
+  bottom: -3px;
+  right: -3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--amber);
+  border: 2px solid var(--bg-card);
+  z-index: 2;
+}
+
 .pip-dot-warn {
   border-color: var(--amber);
   background: rgba(251,191,36,0.12);
@@ -687,6 +705,46 @@ ol, ul            { list-style: none; }
   white-space: pre-wrap;
   word-break: break-all;
 }
+
+/* ── PR links bar ────────────────────────────────────────────────────────── */
+
+.pr-links-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pr-cta-idle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  background: var(--bg-input);
+  color: var(--dim);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: not-allowed;
+}
+
+.issue-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.issue-link:hover { border-color: var(--border-hi); color: var(--text); }
 
 /* ── PR CTA + back link ──────────────────────────────────────────────────── */
 
