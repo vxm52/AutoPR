@@ -7,6 +7,7 @@ import time
 import uuid
 
 import git
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Security
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.background import BackgroundTasks
@@ -16,6 +17,8 @@ from pydantic import BaseModel
 
 from agent.context import Issue, RunContext, StepError
 from agent.controller import PIPELINE
+
+load_dotenv()
 
 app = FastAPI(
     title="AutoPR",
