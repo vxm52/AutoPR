@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import Markdown from 'react-markdown'
 import './App.css'
 
 // ─── Pipeline metadata ────────────────────────────────────────────────────────
@@ -166,15 +167,6 @@ function PipelineVisualizer({ stepLog, status }) {
 
 // ─── Issue preview ────────────────────────────────────────────────────────────
 
-function renderWithCode(text) {
-  const parts = text.split(/(`[^`]+`)/g)
-  return parts.map((part, i) =>
-    part.startsWith('`') && part.endsWith('`')
-      ? <code key={i} className="inline-code">{part.slice(1, -1)}</code>
-      : part
-  )
-}
-
 function IssuePreview({ repo, issueNumber }) {
   const [data, setData]       = useState(null)
   const [loading, setLoading] = useState(false)
@@ -237,11 +229,11 @@ function IssuePreview({ repo, issueNumber }) {
           </span>
         ))}
       </div>
-      <p className="issue-title">{renderWithCode(data.title)}</p>
+      <p className="issue-title"><Markdown>{data.title}</Markdown></p>
       {data.body && (
-        <p className="issue-body">
-          {renderWithCode(data.body.slice(0, 300))}{data.body.length > 300 ? '…' : ''}
-        </p>
+        <div className="issue-body">
+          <Markdown>{data.body.slice(0, 300) + (data.body.length > 300 ? '…' : '')}</Markdown>
+        </div>
       )}
     </div>
   )
