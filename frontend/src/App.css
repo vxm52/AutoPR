@@ -498,6 +498,15 @@ ol, ul            { list-style: none; }
   white-space: pre-wrap;
 }
 
+.inline-code {
+  font-family: monospace;
+  font-size: 0.9em;
+  background: var(--border);
+  color: var(--text);
+  border-radius: 3px;
+  padding: 1px 4px;
+}
+
 /* ── Mock pipeline panel ─────────────────────────────────────────────────── */
 
 .mock-panel {
