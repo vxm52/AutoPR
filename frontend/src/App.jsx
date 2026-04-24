@@ -333,7 +333,7 @@ function StatusBadge({ status }) {
 
 // ─── Mock pipeline preview (animated, landing page only) ─────────────────────
 
-const STEP_DURATIONS  = [700, 1500, 950, 1300, 2200, 650, 1100] // ms per step
+const STEP_DURATIONS  = [2500, 4000, 3000, 5000, 3500, 3200, 5000] // ms per step
 
 const STEP_RUNNING_MSGS = [
   'parsing issue body',
@@ -374,12 +374,64 @@ const MOCK_DIFF_LINES = [
   { cls: 'mock-diff-ctx',  g: ' ',  text: '    return chain.next(req.withUser(user));' },
 ]
 
+const ANIM02_FILES = [
+  'src/auth/AuthMiddleware.java',
+  'src/api/UserController.java',
+  'src/models/User.java',
+  'src/session/SessionManager.java',
+  'src/utils/Logger.java',
+  'src/config/AppConfig.java',
+  'tests/AuthMiddlewareTest.java',
+]
+
+const ANIM03_RESULTS = [
+  { file: 'src/auth/AuthMiddleware.java',    pct: 94 },
+  { file: 'src/api/UserController.java',     pct: 87 },
+  { file: 'src/session/SessionManager.java', pct: 71 },
+  { file: 'src/models/User.java',            pct: 58 },
+]
+
+const ANIM04_JSON = `{
+  "files_to_modify": [
+    {
+      "path": "src/auth/AuthMiddleware.java",
+      "change_summary": "add null session check"
+    }
+  ],
+  "confidence": "high"
+}`
+
+const ANIM07_L1 = '$ git commit -m "fix: add null session check"'
+const ANIM07_L2 = '$ git push origin autopr/issue-42'
+const ANIM07_L3 = '✓ https://github.com/vxm52/wireflow/pull/9'
+const ANIM07_CHAR_MS = 18
+
 function MockPipelinePanel() {
   const [stepStates, setStepStates] = useState(PIPELINE_STEPS.map(() => 'pending'))
   const [stepMsgs,   setStepMsgs]   = useState(PIPELINE_STEPS.map(() => ''))
   const [showPlan,   setShowPlan]   = useState(false)
   const [diffCount,  setDiffCount]  = useState(0)
   const [prDone,     setPrDone]     = useState(false)
+  const [anim02Files,  setAnim02Files]  = useState(0)
+  const [anim02Pct,    setAnim02Pct]    = useState(0)
+  const [anim02Chunks,  setAnim02Chunks]  = useState(0)
+  const [anim03Visible, setAnim03Visible] = useState(0)
+  const [anim03Bars,    setAnim03Bars]    = useState([0, 0, 0, 0])
+  const [anim04CharIdx, setAnim04CharIdx] = useState(0)
+  const [anim04Fading,  setAnim04Fading]  = useState(false)
+  const [anim01ScanKey, setAnim01ScanKey] = useState(0)
+  const [anim01BadgeOn, setAnim01BadgeOn] = useState(false)
+  const [anim06ScanKey, setAnim06ScanKey] = useState(0)
+  const [anim06BadgeOn, setAnim06BadgeOn] = useState(false)
+  const [anim06Fading,  setAnim06Fading]  = useState(false)
+  const [anim07Line1,      setAnim07Line1]      = useState('')
+  const [anim07Line2,      setAnim07Line2]      = useState('')
+  const [anim07Line3,      setAnim07Line3]      = useState('')
+  const [anim07PulseActive, setAnim07PulseActive] = useState(false)
+  const [anim07Fading,     setAnim07Fading]     = useState(false)
+
+  const doneCount     = stepStates.filter(s => s === 'done').length
+  const activeStepIdx = stepStates.findIndex(s => s === 'running')
 
   useEffect(() => {
     let cancelled = false
@@ -425,14 +477,218 @@ function MockPipelinePanel() {
       MOCK_DIFF_LINES.forEach((_, i) => go(() => setDiffCount(i + 1), diffStart + i * 120))
 
       // Loop: hold success state 4s then restart
-      go(() => { setPrDone(false); go(runCycle, 600) }, delay + 4200)
+      go(() => { setPrDone(false); setShowPlan(false); setDiffCount(0); go(runCycle, 600) }, delay + 4200)
     }
 
     runCycle()
     return () => { cancelled = true; timers.forEach(clearTimeout) }
   }, [])
 
-  const doneCount = stepStates.filter(s => s === 'done').length
+  useEffect(() => {
+    if (activeStepIdx !== 0) return
+    let cancelled = false
+    const timers = []
+
+    setAnim01BadgeOn(false)
+
+    // Kick off scan — 150ms delay lets the container fade-in settle first
+    const ts = setTimeout(() => { if (!cancelled) setAnim01ScanKey(k => k + 1) }, 150)
+    timers.push(ts)
+
+    // Scan sweep takes 850ms; badge appears 100ms after scan completes
+    const tb = setTimeout(() => { if (!cancelled) setAnim01BadgeOn(true) }, 1100)
+    timers.push(tb)
+
+    return () => { cancelled = true; timers.forEach(clearTimeout) }
+  }, [activeStepIdx])
+
+  useEffect(() => {
+    if (activeStepIdx !== 1) return
+    let cancelled = false
+    const timers = []
+
+    function runAnim02() {
+      if (cancelled) return
+      setAnim02Files(0)
+      setAnim02Pct(0)
+      setAnim02Chunks(0)
+
+      ANIM02_FILES.forEach((_, i) => {
+        const t = setTimeout(() => { if (!cancelled) setAnim02Files(i + 1) }, i * 350)
+        timers.push(t)
+      })
+
+      const PROG_START = ANIM02_FILES.length * 250  // 1750ms after last file
+      const PROG_DUR   = 2000
+      const TICKS      = 48
+      for (let i = 0; i <= TICKS; i++) {
+        const t = setTimeout(() => {
+          if (!cancelled) {
+            setAnim02Pct(Math.round((i / TICKS) * 100))
+            setAnim02Chunks(Math.round((i / TICKS) * 2847))
+          }
+        }, PROG_START + (i / TICKS) * PROG_DUR)
+        timers.push(t)
+      }
+
+      const t = setTimeout(() => { if (!cancelled) runAnim02() }, PROG_START + PROG_DUR + 2000)
+      timers.push(t)
+    }
+
+    runAnim02()
+    return () => { cancelled = true; timers.forEach(clearTimeout) }
+  }, [activeStepIdx])
+
+  useEffect(() => {
+    if (activeStepIdx !== 2) return
+    let cancelled = false
+    const timers = []
+
+    function runAnim03() {
+      if (cancelled) return
+      setAnim03Visible(0)
+      setAnim03Bars([0, 0, 0, 0])
+
+      const ROW_TICKS = 15  // ticks per bar over 300ms
+      ANIM03_RESULTS.forEach((r, i) => {
+        const rowStart = i * 300
+
+        // Row appears
+        const tv = setTimeout(() => { if (!cancelled) setAnim03Visible(i + 1) }, rowStart)
+        timers.push(tv)
+
+        // Bar fills over 300ms
+        for (let t = 0; t <= ROW_TICKS; t++) {
+          const delay  = rowStart + Math.round((t / ROW_TICKS) * 500)
+          const barPct = Math.round((t / ROW_TICKS) * r.pct)
+          const tb = setTimeout(() => {
+            if (!cancelled) setAnim03Bars(prev => {
+              const next = [...prev]; next[i] = barPct; return next
+            })
+          }, delay)
+          timers.push(tb)
+        }
+      })
+
+      // Hold 1500ms after last bar finishes, then loop
+      const loopAt = (ANIM03_RESULTS.length - 1) * 300 + 500 + 2000
+      const tl = setTimeout(() => { if (!cancelled) runAnim03() }, loopAt)
+      timers.push(tl)
+    }
+
+    runAnim03()
+    return () => { cancelled = true; timers.forEach(clearTimeout) }
+  }, [activeStepIdx])
+
+  useEffect(() => {
+    if (activeStepIdx !== 3) return
+    let cancelled = false
+    const timers = []
+
+    function runAnim04() {
+      if (cancelled) return
+      setAnim04CharIdx(0)
+      setAnim04Fading(false)
+
+      const N       = ANIM04_JSON.length
+      const CHAR_MS = 30
+
+      for (let i = 1; i <= N; i++) {
+        const t = setTimeout(() => { if (!cancelled) setAnim04CharIdx(i) }, i * CHAR_MS)
+        timers.push(t)
+      }
+
+      // Hold 1500ms after last char, then fade out
+      const fadeAt = N * CHAR_MS + 2500
+      const tf = setTimeout(() => { if (!cancelled) setAnim04Fading(true) }, fadeAt)
+      timers.push(tf)
+
+      // After fade (350ms), reset and loop
+      const tl = setTimeout(() => { if (!cancelled) runAnim04() }, fadeAt + 400)
+      timers.push(tl)
+    }
+
+    runAnim04()
+    return () => { cancelled = true; timers.forEach(clearTimeout) }
+  }, [activeStepIdx])
+
+  useEffect(() => {
+    if (activeStepIdx !== 5) return
+    let cancelled = false
+    const timers = []
+
+    function runAnim06() {
+      if (cancelled) return
+      setAnim06BadgeOn(false)
+      setAnim06Fading(false)
+
+      // 1000ms pre-scan delay, then remount scan element → restarts CSS animation
+      const ts = setTimeout(() => { if (!cancelled) setAnim06ScanKey(k => k + 1) }, 1000)
+      timers.push(ts)
+
+      // Badge fades in after pre-scan (1000ms) + scan (800ms) + delay (300ms) = 2100ms
+      const tb = setTimeout(() => { if (!cancelled) setAnim06BadgeOn(true) }, 2100)
+      timers.push(tb)
+
+      // Hold 2000ms after badge appears, then fade inner content
+      const tf = setTimeout(() => { if (!cancelled) setAnim06Fading(true) }, 4100)
+      timers.push(tf)
+
+      // After fade (300ms), loop
+      const tl = setTimeout(() => { if (!cancelled) runAnim06() }, 4400)
+      timers.push(tl)
+    }
+
+    runAnim06()
+    return () => { cancelled = true; timers.forEach(clearTimeout) }
+  }, [activeStepIdx])
+
+  useEffect(() => {
+    if (activeStepIdx !== 6) return
+    let cancelled = false
+    const timers = []
+
+    function runAnim07() {
+      if (cancelled) return
+      setAnim07Line1('')
+      setAnim07Line2('')
+      setAnim07Line3('')
+      setAnim07PulseActive(false)
+      setAnim07Fading(false)
+
+      const t1End = ANIM07_L1.length * ANIM07_CHAR_MS
+      const t2End = t1End + ANIM07_L2.length * ANIM07_CHAR_MS
+      const t3End = t2End + ANIM07_L3.length * ANIM07_CHAR_MS
+
+      for (let i = 1; i <= ANIM07_L1.length; i++) {
+        const t = setTimeout(() => { if (!cancelled) setAnim07Line1(ANIM07_L1.slice(0, i)) }, i * ANIM07_CHAR_MS)
+        timers.push(t)
+      }
+      for (let i = 1; i <= ANIM07_L2.length; i++) {
+        const t = setTimeout(() => { if (!cancelled) setAnim07Line2(ANIM07_L2.slice(0, i)) }, t1End + i * ANIM07_CHAR_MS)
+        timers.push(t)
+      }
+      for (let i = 1; i <= ANIM07_L3.length; i++) {
+        const t = setTimeout(() => { if (!cancelled) setAnim07Line3(ANIM07_L3.slice(0, i)) }, t2End + i * ANIM07_CHAR_MS)
+        timers.push(t)
+      }
+
+      // Pulse URL once after all lines typed
+      const tp = setTimeout(() => { if (!cancelled) setAnim07PulseActive(true) }, t3End)
+      timers.push(tp)
+
+      // Hold 2000ms then fade out
+      const tf = setTimeout(() => { if (!cancelled) setAnim07Fading(true) }, t3End + 2000)
+      timers.push(tf)
+
+      // Loop after fade — large gap ensures it never fires mid-step (step is 5000ms, this fires at ~5714ms)
+      const tl = setTimeout(() => { if (!cancelled) runAnim07() }, t3End + 2000 + 1500)
+      timers.push(tl)
+    }
+
+    runAnim07()
+    return () => { cancelled = true; timers.forEach(clearTimeout) }
+  }, [activeStepIdx])
 
   return (
     <div className="mock-panel">
@@ -469,27 +725,127 @@ function MockPipelinePanel() {
         })}
       </div>
 
-      <div className="mock-plan-block" style={{ opacity: showPlan ? 1 : 0, transition: 'opacity 0.25s ease' }}>
-        <span className="mock-plan-title">plan</span>
-        <div className="mock-plan-line">
-          <span className="mock-plan-sig">modify</span>
-          <span className="mock-plan-path">src/auth/AuthMiddleware.java</span>
-        </div>
-        <div className="mock-plan-desc">add null check before getSession() call</div>
-      </div>
-
-      <div className="mock-diff-block" style={{ opacity: diffCount > 0 ? 1 : 0, transition: 'opacity 0.14s ease' }}>
-        {MOCK_DIFF_LINES.map((line, i) => (
-          <div key={i} className={`mock-diff-line ${line.cls}`} style={{ opacity: i < diffCount ? 1 : 0, transition: 'opacity 0.14s ease' }}>
-            {line.g !== null && <span className="mock-diff-g">{line.g}</span>}
-            {line.text}
+      <div className="mock-panel-content">
+        {/* Step animations — absolutely positioned, overlay content area when active */}
+        <div className="step-anim-container" style={{ opacity: activeStepIdx === 0 ? 1 : 0 }}>
+          <div className="anim01-card">
+            <div className="anim01-meta-row">
+              <span className="anim01-issue-num">#42</span>
+              <span className="anim01-state-open">open</span>
+            </div>
+            <div className="anim01-header">
+              <span className="anim01-title">Fix null session handling</span>
+              <span className={`anim01-badge${anim01BadgeOn ? ' anim01-badge-on' : ''}`}>bug_fix</span>
+            </div>
+            <div className="anim01-body">
+              <span>Sessions return null when token expires...</span>
+              <span>causing NPE in AuthMiddleware on line 42</span>
+            </div>
+            <div key={anim01ScanKey} className="anim01-scan" />
           </div>
-        ))}
-        <div className="mock-pr-success" style={{ opacity: prDone ? 1 : 0, transition: 'opacity 0.3s ease' }}>
-          <IconCheck />
-          <span>autopr/issue-42</span>
-          <span className="mock-pr-arrow">→</span>
-          <span className="mock-pr-url">github.com/org/repo/pull/47</span>
+        </div>
+        <div className="step-anim-container" style={{ opacity: activeStepIdx === 1 ? 1 : 0 }}>
+          <div className="anim02-wrap">
+            <div className="anim02-tree">
+              {ANIM02_FILES.map((f, i) => (
+                <div key={i} className={`anim02-file${anim02Files > i ? ' anim02-file-on' : ''}`}>
+                  <span className="anim02-arrow">›</span>{f}
+                </div>
+              ))}
+            </div>
+            <div className="anim02-progress-wrap">
+              <div className="anim02-bar">
+                <div className="anim02-fill" style={{ width: `${anim02Pct}%` }} />
+              </div>
+              <span className="anim02-counter">indexing… {anim02Chunks.toLocaleString()} / 2,847 chunks</span>
+            </div>
+          </div>
+        </div>
+        <div className="step-anim-container" style={{ opacity: activeStepIdx === 2 ? 1 : 0 }}>
+          <div className="anim03-wrap">
+            {ANIM03_RESULTS.map((r, i) => (
+              <div
+                key={i}
+                className={`anim03-row${i === 0 ? ' anim03-row-top' : ''}${anim03Visible > i ? ' anim03-row-on' : ''}`}
+              >
+                <div className="anim03-row-header">
+                  <span className="anim03-file">{r.file}</span>
+                  <span className="anim03-pct">{anim03Bars[i]}%</span>
+                </div>
+                <div className="anim03-bar">
+                  <div className="anim03-fill" style={{ width: `${anim03Bars[i]}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="step-anim-container" style={{ opacity: activeStepIdx === 3 ? 1 : 0 }}>
+          <div className={`anim04-wrap${anim04Fading ? ' anim04-fading' : ''}`}>
+            <pre className="anim04-pre">{ANIM04_JSON.slice(0, anim04CharIdx)}<span className="mock-cursor">▋</span></pre>
+          </div>
+        </div>
+        <div className="step-anim-container anim06-overlay" style={{ opacity: activeStepIdx === 4 ? 1 : 0 }} />
+        <div className="step-anim-container anim06-overlay" style={{ opacity: activeStepIdx === 5 ? 1 : 0 }}>
+          <div className={`anim06-inner${anim06Fading ? ' anim06-fading' : ''}`}>
+            <div key={anim06ScanKey} className="anim06-scan" />
+            <span className={`anim06-badge${anim06BadgeOn ? ' anim06-badge-on' : ''}`}>✓ validated</span>
+          </div>
+        </div>
+        <div className="step-anim-container" style={{ opacity: activeStepIdx === 6 || doneCount === PIPELINE_STEPS.length ? 1 : 0 }}>
+          <div className="anim07-terminal">
+            <div className="anim07-terminal-hd">
+              <div className="anim07-terminal-lights">
+                <span className="mock-light mock-light-red" />
+                <span className="mock-light mock-light-yellow" />
+                <span className="mock-light mock-light-green" />
+              </div>
+              <span className="anim07-terminal-title">autopr/issue-42 — bash</span>
+            </div>
+            <div className="anim07-terminal-body">
+              <div className={`anim07-wrap${anim07Fading ? ' anim07-fading' : ''}`}>
+                {anim07Line1 && (
+                  <span className="anim07-line">
+                    {anim07Line1}{!anim07Line2 && <span className="mock-cursor">▋</span>}
+                  </span>
+                )}
+                {anim07Line2 && (
+                  <span className="anim07-line">
+                    {anim07Line2}{!anim07Line3 && <span className="mock-cursor">▋</span>}
+                  </span>
+                )}
+                {anim07Line3 && (
+                  <span className={`anim07-line anim07-url${anim07PulseActive ? ' anim07-url-pulse' : ''}`}>
+                    {anim07Line3}{!anim07Fading && <span className="mock-cursor">▋</span>}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Underlying content — plan and diff blocks */}
+        <div className="mock-plan-block" style={{ opacity: showPlan ? 1 : 0, transition: 'opacity 0.25s ease' }}>
+          <span className="mock-plan-title">plan</span>
+          <div className="mock-plan-line">
+            <span className="mock-plan-sig">modify</span>
+            <span className="mock-plan-path">src/auth/AuthMiddleware.java</span>
+          </div>
+          <div className="mock-plan-desc">add null check before getSession() call</div>
+        </div>
+
+        <div className="mock-diff-block" style={{ opacity: diffCount > 0 ? 1 : 0, transition: 'opacity 0.14s ease' }}>
+          {MOCK_DIFF_LINES.map((line, i) => (
+            <div key={i} className={`mock-diff-line ${line.cls}`} style={{ opacity: i < diffCount ? 1 : 0, transition: 'opacity 0.14s ease' }}>
+              {line.g !== null && <span className="mock-diff-g">{line.g}</span>}
+              {line.text}
+            </div>
+          ))}
+          <div className="mock-pr-success" style={{ opacity: prDone ? 1 : 0, transition: 'opacity 0.3s ease' }}>
+            <IconCheck />
+            <span>autopr/issue-42</span>
+            <span className="mock-pr-arrow">→</span>
+            <span className="mock-pr-url">github.com/org/repo/pull/47</span>
+          </div>
         </div>
       </div>
     </div>
