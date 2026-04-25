@@ -229,7 +229,7 @@ function IssuePreview({ repo, issueNumber }) {
           </span>
         ))}
       </div>
-      <p className="issue-title"><Markdown>{data.title}</Markdown></p>
+      <div className="issue-title"><Markdown>{data.title}</Markdown></div>
       {data.body && (
         <div className="issue-body">
           <Markdown>{data.body.slice(0, 300) + (data.body.length > 300 ? '…' : '')}</Markdown>
@@ -449,8 +449,10 @@ function MockPipelinePanel() {
       setShowPlan(false)
       setDiffCount(0)
       setPrDone(false)
+      setAnim06BadgeOn(false)
+      setAnim06Fading(false)
 
-      let delay = 600
+      let delay = 200
       const startAt = []
 
       PIPELINE_STEPS.forEach((_, i) => {
@@ -476,8 +478,8 @@ function MockPipelinePanel() {
       const diffStart = startAt[4] + 200
       MOCK_DIFF_LINES.forEach((_, i) => go(() => setDiffCount(i + 1), diffStart + i * 120))
 
-      // Loop: hold success state 4s then restart
-      go(() => { setPrDone(false); setShowPlan(false); setDiffCount(0); go(runCycle, 600) }, delay + 4200)
+      // Hold 4s, fade terminal, then restart
+      go(() => { setAnim07Fading(true); go(runCycle, 350) }, delay + 4000)
     }
 
     runCycle()
@@ -673,17 +675,9 @@ function MockPipelinePanel() {
         timers.push(t)
       }
 
-      // Pulse URL once after all lines typed
+      // Pulse URL once after all lines typed; hold until outer cycle triggers the fade
       const tp = setTimeout(() => { if (!cancelled) setAnim07PulseActive(true) }, t3End)
       timers.push(tp)
-
-      // Hold 2000ms then fade out
-      const tf = setTimeout(() => { if (!cancelled) setAnim07Fading(true) }, t3End + 2000)
-      timers.push(tf)
-
-      // Loop after fade — large gap ensures it never fires mid-step (step is 5000ms, this fires at ~5714ms)
-      const tl = setTimeout(() => { if (!cancelled) runAnim07() }, t3End + 2000 + 1500)
-      timers.push(tl)
     }
 
     runAnim07()
@@ -907,7 +901,7 @@ function LogBlock({ lines }) {
       <div className="log-body">
         {lines.length === 0
           ? <span className="log-empty">Waiting for pipeline…</span>
-          : lines.map((ln, i) => <LogLine key={ln} line={ln} idx={i} />)
+          : lines.map((ln, i) => <LogLine key={i} line={ln} idx={i} />)
         }
         <div ref={endRef} />
       </div>
