@@ -8,23 +8,39 @@ import uuid
 
 import git
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Security
+from fastapi import FastAPI, HTTPException, Request, Security
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.background import BackgroundTasks
 from fastapi.security.api_key import APIKeyHeader
 from github import Github
 from pydantic import BaseModel
+from fastapi.responses import JSONResponse
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from agent.context import Issue, RunContext, StepError
 from agent.controller import PIPELINE
 
 load_dotenv()
 
+_RATE_LIMIT = os.environ.get("RATE_LIMIT", "5/minute")
+
+limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI(
     title="AutoPR",
     description="Autonomous developer agent that creates PRs from GitHub issues",
     version="0.1.0",
 )
+app.state.limiter = limiter
+def _rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "Too many requests — please wait before starting another run"},
+    )
+
+app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
 
 app.add_middleware(
     CORSMiddleware,
@@ -157,15 +173,17 @@ async def health() -> dict:
 
 
 @app.post("/run")
+@limiter.limit(_RATE_LIMIT)
 async def run_pipeline(
-    request: RunRequest,
+    request: Request,
+    body: RunRequest,
     background_tasks: BackgroundTasks,
     _: None = Security(_require_api_key),
 ) -> dict:
-    if "/" not in request.repo:
+    if "/" not in body.repo:
         raise HTTPException(status_code=400, detail="repo must be in owner/name format")
 
-    owner, name = request.repo.split("/", 1)
+    owner, name = body.repo.split("/", 1)
     if not _SAFE_NAME_RE.match(owner) or not _SAFE_NAME_RE.match(name):
         raise HTTPException(status_code=400, detail="owner and repo name must be alphanumeric (letters, digits, _ . -)")
 
@@ -183,7 +201,7 @@ async def run_pipeline(
             "_created": time.time(),
         }
 
-    background_tasks.add_task(_run_pipeline, run_id, request.issue_number, owner, name)
+    background_tasks.add_task(_run_pipeline, run_id, body.issue_number, owner, name)
     return {"run_id": run_id, "status": "pending"}
 
 @app.get("/stats")
