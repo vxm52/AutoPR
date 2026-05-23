@@ -8,6 +8,7 @@ export default defineConfig({
       '/run': 'http://localhost:8000',
       '/status': 'http://localhost:8000',
       '/health': 'http://localhost:8000',
+      '/stats': 'http://localhost:8000',
     },
   },
 })

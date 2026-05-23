@@ -93,9 +93,23 @@ const IconChevron = () => (
 // ─── Navbar ───────────────────────────────────────────────────────────────────
 
 function Navbar() {
+  const [runCount, setRunCount] = useState(null)
+
+  useEffect(() => {
+    fetch('/stats')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.total_runs != null) setRunCount(d.total_runs) })
+      .catch(() => {})
+  }, [])
+
   return (
     <nav className="navbar">
-      <span className="navbar-logo"><IconBranch />AutoPR</span>
+      <span className="navbar-logo">
+        <IconBranch />AutoPR
+        {runCount != null && (
+          <span className="navbar-run-count">· {runCount} runs</span>
+        )}
+      </span>
     </nav>
   )
 }
@@ -969,7 +983,7 @@ function HomePage({ onRunStarted }) {
         <div className="hero-left">
           <div className="hero-badge">
             <span className="hero-badge-dot" />
-            AUTONOMOUS AGENT
+            groq · llama-3.3-70b · ~200 tok/s
           </div>
           <h1 className="hero-headline">AutoPR</h1>
           <p className="hero-subline">

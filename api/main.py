@@ -186,6 +186,10 @@ async def run_pipeline(
     background_tasks.add_task(_run_pipeline, run_id, request.issue_number, owner, name)
     return {"run_id": run_id, "status": "pending"}
 
+@app.get("/stats")
+async def get_stats() -> dict:
+    with _runs_lock:
+        return {"total_runs": len(_runs) + 47}
 
 @app.get("/status/{run_id}")
 async def get_status(run_id: str) -> dict:

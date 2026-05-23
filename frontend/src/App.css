@@ -55,6 +55,15 @@ ol, ul            { list-style: none; }
 
 .navbar-logo svg { color: var(--blue); }
 
+.navbar-run-count {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text);
+  opacity: 0.35;
+  letter-spacing: -0.1px;
+}
+
 /* ── Progress bar ────────────────────────────────────────────────────────── */
 
 .progress-bar {
