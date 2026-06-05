@@ -12,7 +12,7 @@ AutoPR runs a seven-step pipeline. Each step is a discrete module; a shared `Run
 |---|------|-------------|
 | 1 | **Issue Parser** | Classifies the issue as `bug_fix`, `feature`, or `refactor` via LLM |
 | 2 | **Repo Indexer** | Chunks the codebase by function/class boundary and builds a FAISS semantic index |
-| 3 | **Retriever** | Embeds the issue and retrieves the top-4 most relevant files by cosine similarity |
+| 3 | **Retriever** | Embeds the issue, fetches 20 FAISS candidates, reranks them with a CrossEncoder, returns top-5 |
 | 4 | **Planner** | Asks the LLM to produce a structured JSON change plan (files to modify, reasoning, confidence) |
 | 5 | **Code Generator** | For each file in the plan, sends a separate LLM call and receives the complete modified file |
 | 6 | **Diff Generator** | Computes unified diffs with `difflib` and validates each one with `patch --dry-run` |
@@ -24,12 +24,12 @@ AutoPR runs a seven-step pipeline. Each step is a discrete module; a shared `Run
 ```
 autopr/
 ├── agent/
-│   ├── controller.py       # Sequential step runner (AgentController)
+│   ├── controller.py       # Sequential step runner
 │   ├── context.py          # RunContext dataclass — shared state across all steps
 │   └── steps/
 │       ├── issue_parser.py
 │       ├── repo_indexer.py
-│       ├── retriever.py
+│       ├── retriever.py    # FAISS + CrossEncoder reranker
 │       ├── planner.py
 │       ├── code_generator.py
 │       ├── diff_generator.py
@@ -37,7 +37,7 @@ autopr/
 ├── api/
 │   └── main.py             # FastAPI app — /run and /status endpoints
 ├── llm/
-│   ├── client.py           # OpenAI-compatible LLM wrapper
+│   ├── client.py           # OpenAI-compatible LLM wrapper with retry logic
 │   └── mock_client.py      # Deterministic mock for local testing
 ├── github_client/
 │   └── client.py           # PyGitHub wrapper
@@ -55,8 +55,8 @@ The API runs pipeline steps one-by-one and pushes `step_log` updates after each 
 
 - Python 3.10+
 - Node 18+ (for the frontend)
-- A GitHub personal access token with `repo` scope and `Contents` + `Pull requests` write permissions
-- A course-provided or OpenAI-compatible LLM endpoint
+- A GitHub personal access token with `repo` scope (Contents + Pull requests write)
+- A Groq API key — free at [console.groq.com](https://console.groq.com), no credit card required
 
 ---
 
@@ -74,29 +74,43 @@ pip install -e ".[dev]"
 
 **2. Configure environment**
 
-Create a `.env` file in the project root with the following variables:
+```bash
+cp .env.example .env
+```
+
+Fill in your `.env`:
 
 ```bash
-# GitHub — personal access token with repo scope (Contents + Pull requests write)
+# GitHub — personal access token with repo scope
 GITHUB_TOKEN=ghp_...
 
-# LLM — OpenAI-compatible endpoint
-LLM_API_KEY=...
-LLM_BASE_URL=...        # e.g. https://api.openai.com/v1
-LLM_MODEL=gpt-4o        # optional — set if the API requires a model name
+# LLM — Groq is recommended (free, fast, no credit card)
+# Sign up at console.groq.com and create an API key
+LLM_API_KEY=gsk_...
+LLM_BASE_URL=https://api.groq.com/openai/v1
+LLM_MODEL=llama-3.3-70b-versatile
+
+# API authentication — all /run requests require this header (X-API-Key)
+# If not set, a key is auto-generated and printed to stdout at startup
+AUTOPR_API_KEY=your-secret-key
+
+# Rate limiting (default: 5 requests per minute per IP)
+RATE_LIMIT=5/minute
+
+# Retrieval — number of reranked chunks sent to the planner
+RETRIEVER_TOP_K=5
 
 # Local clone cache
 REPO_CLONE_PATH=/tmp/autopr_repos
 
-# Set to true to run the full pipeline without real LLM calls (for development/testing)
+# Set to true to run without real LLM calls (for development/testing)
 USE_MOCK_LLM=false
 ```
 
 **3. Install frontend dependencies**
 
 ```bash
-cd frontend
-npm install
+cd frontend && npm install
 ```
 
 ---
@@ -107,20 +121,22 @@ npm install
 
 ```bash
 source venv/bin/activate
-set -a; source .env; set +a
 uvicorn api.main:app --reload
 ```
 
 The API listens on `http://localhost:8000`.
 
+> **Note:** On first run, the retriever downloads the CrossEncoder reranking model (~80MB). This is a one-time download — subsequent runs use the cached model.
+
 **Frontend**
 
 ```bash
-cd frontend
-npm run dev
+cd frontend && npm run dev
 ```
 
-The UI runs on `http://localhost:5173`. Vite proxies `/run` and `/status` to the API automatically — no CORS setup needed.
+The UI runs on `http://localhost:5173`.
+
+> **Note:** The issue preview in the UI fetches from GitHub's public API. The target repo must be public for the preview to load.
 
 ---
 
@@ -132,11 +148,14 @@ The UI runs on `http://localhost:5173`. Vite proxies `/run` and `/status` to the
 | `POST` | `/run` | Start a pipeline run |
 | `GET` | `/status/{run_id}` | Poll run state |
 
+All `/run` requests require the `X-API-Key` header.
+
 **Start a run**
 
 ```bash
 curl -X POST http://localhost:8000/run \
   -H 'Content-Type: application/json' \
+  -H 'X-API-Key: your-secret-key' \
   -d '{"repo": "owner/repo-name", "issue_number": 42}'
 ```
 
@@ -147,14 +166,15 @@ curl -X POST http://localhost:8000/run \
 **Poll status**
 
 ```bash
-curl http://localhost:8000/status/a1b2c3d4-...
+curl http://localhost:8000/status/a1b2c3d4-... \
+  -H 'X-API-Key: your-secret-key'
 ```
 
 ```json
 {
   "run_id": "a1b2c3d4-...",
   "status": "done",
-  "step_log": ["OK  agent.steps.issue_parser", "OK  agent.steps.repo_indexer", "..."],
+  "step_log": ["OK  agent.steps.issue_parser", "..."],
   "errors": [],
   "pr_url": "https://github.com/owner/repo-name/pull/7",
   "diffs": ["--- a/src/foo.py\n+++ b/src/foo.py\n..."]
@@ -181,33 +201,37 @@ Runs the full pipeline with the mock LLM against `/tmp/wireflow`. No API keys or
 GITHUB_TOKEN=your_token python tests/test_e2e_real_pr.py
 ```
 
-Clones a real repo, forces a real diff via mock patch, and creates an actual PR on GitHub. Verify the PR appears at `https://github.com/vxm52/wireflow/pulls` then close and delete the branch after testing.
+Clones a real repo, forces a real diff, and creates an actual PR on GitHub. Close and delete the branch after testing.
 
 ---
 
 ## UI features
 
-- **Pipeline visualizer** — live node graph showing each step's state (idle / active / ok / warn / err) with connecting lines that fill as steps complete
-- **Issue preview** — fetches the GitHub issue from the public API and shows title, body, and labels before you submit
+- **Pipeline visualizer** — live node graph showing each step's state (idle / active / ok / warn / err)
+- **Issue preview** — fetches the GitHub issue and shows title, body, and status before you submit
+- **Live step log** — monospace terminal feed with each entry arriving in real time
 - **Diff viewer** — syntax-highlighted unified diff for every file the agent changed
-- **Live step log** — monospace terminal feed; each entry slides in as it arrives
-- **Progress bar** — top-of-page bar that fills step-by-step while the pipeline runs
+- **Animated mock panel** — right-column hero animation showing each pipeline step with a unique visual
 
 ---
 
 ## Design decisions
 
-**One LLM call per file.** The code generator never batches multiple files into a single prompt. Each call gets: system prompt + the current file + the change instruction. Tight context = fewer hallucinations.
+**One LLM call per file.** The code generator never batches multiple files into a single prompt. Each call gets: system prompt + the current file + the change instruction. Tight context produces more reliable output.
 
 **Diffs are computed by `difflib`, not the LLM.** The LLM returns the complete modified file; diffing is deterministic and happens in `diff_generator`.
 
+**Two-stage retrieval.** The retriever uses FAISS for fast approximate search over the full codebase (top-20 candidates), then a CrossEncoder reranker for precision scoring against the full issue text. This produces better results than embedding similarity alone, especially for ambiguous issues.
+
 **FAISS index is cached.** `repo_indexer` skips re-embedding if the index already exists and files are unchanged.
 
-**Low-confidence plans fail fast.** If the planner sets `"confidence": "low"` or returns malformed JSON, `StepError` is raised immediately rather than proceeding with a bad plan.
+**Low-confidence plans log a warning and continue.** If the planner returns `"confidence": "low"`, AutoPR logs a warning to `step_log` and proceeds rather than failing hard. If the plan returns malformed JSON, `StepError` is raised immediately.
+
+**LLM calls retry on transient failures.** The client retries up to 3 times with exponential backoff (1s, 2s) on network errors and HTTP 429/5xx responses.
 
 **Branch names are unique per issue.** Format: `autopr/issue-{number}`. If that branch already exists, AutoPR appends `-retry-{n}`.
 
-**Mock LLM for development.** Setting `USE_MOCK_LLM=true` routes all LLM calls to `MockLLMClient`, which returns deterministic hardcoded responses keyed on system prompt keywords. This lets you build and test the full pipeline without API credentials. Set `USE_MOCK_LLM=false` and supply real credentials only when you're ready for a live run.
+**Mock LLM for development.** `USE_MOCK_LLM=true` routes all LLM calls to `MockLLMClient`, which returns deterministic responses. Build and test the full pipeline — including real git branches and GitHub PRs — without API credentials.
 
 ---
 
