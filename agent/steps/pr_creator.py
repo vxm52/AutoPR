@@ -106,3 +106,14 @@ def run(ctx: RunContext) -> None:
         ctx.step_log.append(f"OK   pr_creator: {ctx.pr_url}")
     except Exception as e:
         raise StepError(f"pr_creator: PR creation failed — {e}") from e
+
+    try:
+        gh_issue = gh_repo.get_issue(ctx.issue.number)
+        gh_issue.create_comment(
+            f"🤖 AutoPR has opened a pull request to address this issue.\n\n"
+            f"**PR:** {ctx.pr_url}\n\n"
+            f"*This PR was generated automatically. Please review the changes before merging.*"
+        )
+        ctx.step_log.append(f"pr_creator: posted comment on issue #{ctx.issue.number}")
+    except Exception as e:
+        ctx.step_log.append(f"WARN pr_creator: failed to post comment on issue #{ctx.issue.number} — {e}")

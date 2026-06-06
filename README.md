@@ -55,7 +55,7 @@ The API runs pipeline steps one-by-one and pushes `step_log` updates after each 
 
 - Python 3.10+
 - Node 18+ (for the frontend)
-- A GitHub personal access token with `repo` scope (Contents + Pull requests write)
+- A GitHub personal access token with `repo` scope (Contents, Pull requests, and Issues write)
 - A Groq API key — free at [console.groq.com](https://console.groq.com), no credit card required
 
 ---
