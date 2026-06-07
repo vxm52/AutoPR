@@ -1,5 +1,6 @@
 import os
 import re
+import uuid
 import git
 from github import Github  # PyGitHub package
 from agent.context import RunContext, StepError
@@ -15,16 +16,6 @@ def _safe_path(repo_path: str, rel_path: str) -> str:
     if not resolved.startswith(root + os.sep) and resolved != root:
         raise StepError(f"pr_creator: path escapes repo root: {rel_path!r}")
     return resolved
-
-
-def _pick_branch_name(repo: git.Repo, base: str) -> str:
-    existing = {h.name for h in repo.heads}
-    if base not in existing:
-        return base
-    n = 1
-    while f"{base}-retry-{n}" in existing:
-        n += 1
-    return f"{base}-retry-{n}"
 
 
 def _build_pr_body(ctx: RunContext) -> str:
@@ -47,8 +38,20 @@ def run(ctx: RunContext) -> None:
     if default_branch in ("main", "master"):
         pass  # we're on the base; that's fine — we'll branch off it
 
-    base_branch_name = f"autopr/issue-{ctx.issue.number}"
-    branch_name = _pick_branch_name(repo, base_branch_name)
+    # Unique per-run branch name.
+    #
+    # The previous scheme derived the branch name from the issue number and
+    # de-duplicated against *local* heads only (repo.heads). In the API flow the
+    # repo is freshly cloned/pulled on each run, so local heads never reflect
+    # branches or open PRs that already exist on the remote. Re-running on the
+    # same issue therefore produced the name `autopr/issue-N` again, collided
+    # with the still-open PR on that head, and GitHub rejected create_pull.
+    #
+    # A short random suffix makes each run's branch unique regardless of local
+    # OR remote state, so every run always produces a clean, openable PR with no
+    # extra network round-trips.
+    run_suffix = uuid.uuid4().hex[:6]
+    branch_name = f"autopr/issue-{ctx.issue.number}-{run_suffix}"
 
     try:
         new_branch = repo.create_head(branch_name)
