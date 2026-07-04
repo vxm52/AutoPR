@@ -444,6 +444,10 @@ function MockPipelinePanel() {
   const [anim07PulseActive, setAnim07PulseActive] = useState(false)
   const [anim07Fading,     setAnim07Fading]     = useState(false)
 
+  const isPaused      = useRef(false)
+  const [paused,      setPaused]  = useState(false)
+  const [runKey,      setRunKey]  = useState(0)
+
   const doneCount     = stepStates.filter(s => s === 'done').length
   const activeStepIdx = stepStates.findIndex(s => s === 'running')
 
@@ -452,7 +456,7 @@ function MockPipelinePanel() {
     const timers  = []
 
     function go(fn, delay) {
-      const t = setTimeout(() => { if (!cancelled) fn() }, delay)
+      const t = setTimeout(() => { if (!cancelled && !isPaused.current) fn() }, delay)
       timers.push(t)
     }
 
@@ -498,7 +502,7 @@ function MockPipelinePanel() {
 
     runCycle()
     return () => { cancelled = true; timers.forEach(clearTimeout) }
-  }, [])
+  }, [runKey])
 
   useEffect(() => {
     if (activeStepIdx !== 0) return
@@ -698,6 +702,19 @@ function MockPipelinePanel() {
     return () => { cancelled = true; timers.forEach(clearTimeout) }
   }, [activeStepIdx])
 
+  function togglePause() {
+    if (isPaused.current) {
+      // Resume — restart the cycle from the beginning.
+      isPaused.current = false
+      setPaused(false)
+      setRunKey(k => k + 1)
+    } else {
+      // Pause — freeze the current step in place.
+      isPaused.current = true
+      setPaused(true)
+    }
+  }
+
   return (
     <div className="mock-panel">
       <div className="mock-titlebar">
@@ -707,6 +724,13 @@ function MockPipelinePanel() {
           <span className="mock-light mock-light-green" />
         </div>
         <span className="mock-title">autopr-run · issue #42</span>
+        <button
+          className="mock-pause-btn"
+          onClick={togglePause}
+          aria-label={paused ? 'Resume animation' : 'Pause animation'}
+        >
+          {paused ? '▶' : '⏸'}
+        </button>
         <span className="mock-counter">{doneCount}/{PIPELINE_STEPS.length}</span>
       </div>
 
