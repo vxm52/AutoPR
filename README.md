@@ -24,27 +24,27 @@ AutoPR runs a seven-step pipeline. Each step is a discrete module; a shared `Run
 ```
 autopr/
 ├── agent/
-│   ├── controller.py       # Sequential step runner
-│   ├── context.py          # RunContext dataclass — shared state across all steps
+│   ├── controller.py         # Sequential step runner
+│   ├── context.py            # RunContext dataclass — shared state across all steps
 │   └── steps/
 │       ├── issue_parser.py
 │       ├── repo_indexer.py
-│       ├── retriever.py    # FAISS + CrossEncoder reranker
+│       ├── retriever.py      # FAISS + CrossEncoder reranker
 │       ├── planner.py
 │       ├── code_generator.py
 │       ├── diff_generator.py
 │       └── pr_creator.py
 ├── api/
-│   └── main.py             # FastAPI app — /run and /status endpoints
+│   └── main.py               # FastAPI app — /run and /status endpoints
 ├── llm/
-│   ├── client.py           # OpenAI-compatible LLM wrapper with retry logic
-│   └── mock_client.py      # Deterministic mock for local testing
+│   ├── client.py             # OpenAI-compatible LLM wrapper with retry logic
+│   └── mock_client.py        # Deterministic mock for local testing
 ├── github_client/
-│   └── client.py           # PyGitHub wrapper
-├── frontend/               # React + Vite UI
+│   └── client.py             # PyGitHub wrapper
+├── frontend/                 # React + Vite UI
 └── tests/
-    ├── test_e2e.py         # End-to-end test with USE_MOCK_LLM=true
-    └── test_e2e_real_pr.py # Full PR creation test against a real GitHub repo
+    ├── test_e2e.py           # End-to-end test with USE_MOCK_LLM=true
+    └── test_e2e_real_pr.py   # Full PR creation test against a real GitHub repo
 ```
 
 The API runs pipeline steps one-by-one and pushes `step_log` updates after each step, so the frontend can stream live progress without websockets.
