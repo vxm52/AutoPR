@@ -43,8 +43,8 @@ autopr/
 │   └── client.py           # PyGitHub wrapper
 ├── frontend/               # React + Vite UI
 └── tests/
-├── test_e2e.py         # End-to-end test with USE_MOCK_LLM=true
-└── test_e2e_real_pr.py # Full PR creation test against a real GitHub repo
+    ├── test_e2e.py         # End-to-end test with USE_MOCK_LLM=true
+    └── test_e2e_real_pr.py # Full PR creation test against a real GitHub repo
 ```
 
 The API runs pipeline steps one-by-one and pushes `step_log` updates after each step, so the frontend can stream live progress without websockets.
